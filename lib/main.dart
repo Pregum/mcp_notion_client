@@ -30,11 +30,23 @@ Future<void> setupMcpClient() async {
     capabilities: ClientCapabilities(sampling: true),
   );
 
+  // final transport = await McpClient.createStdioTransport(
+  //   command: 'npx',
+  //   arguments: ['-y', '@notionhq/notion-mcp-server'],
+  //   workingDirectory: './',
+  //   environment: {
+  //     'NOTION_API_KEY': const String.fromEnvironment('NOTION_API_KEY'),
+  //   },
+  // );
   final transport = await McpClient.createSseTransport(
-    serverUrl: 'http://10.0.2.2:8080/sse',
+    serverUrl: 'http://192.168.11.35:8080/sse',
+    headers: {
+      'Authorization':
+          'Bearer ${const String.fromEnvironment('NOTION_API_KEY')}',
+    },
   );
   await mcpClient.connect(transport);
-  
+
   // ブリッジの初期化
   bridge = GeminiMcpBridge(mcp: mcpClient, model: geminiModel);
 }
@@ -71,10 +83,7 @@ class _ChatScreenState extends State<ChatScreen> {
     if (text.isEmpty) return;
 
     setState(() {
-      _messages.add(ChatMessage(
-        text: text,
-        isUser: true,
-      ));
+      _messages.add(ChatMessage(text: text, isUser: true));
       _isLoading = true;
     });
 
@@ -83,18 +92,12 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       final response = await bridge.chat(text);
       setState(() {
-        _messages.add(ChatMessage(
-          text: response,
-          isUser: false,
-        ));
+        _messages.add(ChatMessage(text: response, isUser: false));
         _isLoading = false;
       });
     } catch (e) {
       setState(() {
-        _messages.add(ChatMessage(
-          text: 'エラーが発生しました: $e',
-          isUser: false,
-        ));
+        _messages.add(ChatMessage(text: 'エラーが発生しました: $e', isUser: false));
         _isLoading = false;
       });
     }
@@ -125,9 +128,7 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           const Divider(height: 1.0),
           Container(
-            decoration: BoxDecoration(
-              color: Theme.of(context).cardColor,
-            ),
+            decoration: BoxDecoration(color: Theme.of(context).cardColor),
             child: _buildTextComposer(),
           ),
         ],
@@ -169,11 +170,7 @@ class ChatMessage extends StatelessWidget {
   final String text;
   final bool isUser;
 
-  const ChatMessage({
-    super.key,
-    required this.text,
-    required this.isUser,
-  });
+  const ChatMessage({super.key, required this.text, required this.isUser});
 
   @override
   Widget build(BuildContext context) {
@@ -184,9 +181,7 @@ class ChatMessage extends StatelessWidget {
         children: [
           Container(
             margin: const EdgeInsets.only(right: 16.0),
-            child: CircleAvatar(
-              child: Text(isUser ? 'U' : 'A'),
-            ),
+            child: CircleAvatar(child: Text(isUser ? 'U' : 'A')),
           ),
           Expanded(
             child: Column(
