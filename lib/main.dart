@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:mcp_client/mcp_client.dart';
+import 'gemini_mcp_bridge.dart';
 
 Future<void> main() async {
   // 2. MCPクライアントの初期化
@@ -10,29 +11,32 @@ Future<void> main() async {
   runApp(const MyApp());
 }
 
+late Client mcpClient;
+late GenerativeModel geminiModel;
+late GeminiMcpBridge bridge;
+
 Future<void> prepareGemini() async {
   // Gemini 2.5 Pro は Function Calling がデフォルト有効。
-  final gemini = GenerativeModel(
-    model:
-        'gemini-2.5-pro', // 2025-04 GA モデル  [oai_citation:10‡IT Pro](https://www.itpro.com/cloud/live/google-cloud-next-2025-all-the-news-and-updates-live?utm_source=chatgpt.com)
+  geminiModel = GenerativeModel(
+    model: 'gemini-2.5-pro',
     apiKey: const String.fromEnvironment('GEMINI_API_KEY'),
   );
 }
 
 Future<void> setupMcpClient() async {
-  final mcp = McpClient.createClient(
+  mcpClient = McpClient.createClient(
     name: 'MuseumJourney',
     version: '1.0.0',
-    capabilities: ClientCapabilities(
-      sampling: true, // Gemini による LLM 生成も流せる
-    ),
+    capabilities: ClientCapabilities(sampling: true),
   );
 
-  // Android エミュ とのローカル接続例 (SSE)
   final transport = await McpClient.createSseTransport(
     serverUrl: 'http://10.0.2.2:8080/sse',
   );
-  await mcp.connect(transport); // 🔑 ここでハンドシェイク
+  await mcpClient.connect(transport);
+  
+  // ブリッジの初期化
+  bridge = GeminiMcpBridge(mcp: mcpClient, model: geminiModel);
 }
 
 class MyApp extends StatelessWidget {
@@ -41,57 +45,165 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      title: 'MCP Demo',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        useMaterial3: true,
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      home: const ChatScreen(),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  final String title;
+class ChatScreen extends StatefulWidget {
+  const ChatScreen({super.key});
 
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  State<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+class _ChatScreenState extends State<ChatScreen> {
+  final TextEditingController _textController = TextEditingController();
+  final List<ChatMessage> _messages = [];
+  bool _isLoading = false;
 
-  void _incrementCounter() {
+  void _handleSubmitted(String text) async {
+    if (text.isEmpty) return;
+
     setState(() {
-      _counter++;
+      _messages.add(ChatMessage(
+        text: text,
+        isUser: true,
+      ));
+      _isLoading = true;
     });
+
+    _textController.clear();
+
+    try {
+      final response = await bridge.chat(text);
+      setState(() {
+        _messages.add(ChatMessage(
+          text: response,
+          isUser: false,
+        ));
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _messages.add(ChatMessage(
+          text: 'エラーが発生しました: $e',
+          isUser: false,
+        ));
+        _isLoading = false;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        title: const Text('MCP Demo'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-
-        title: Text(widget.title),
       ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text('You have pushed the button this many times:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
+      body: Column(
+        children: [
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.all(8.0),
+              itemCount: _messages.length,
+              itemBuilder: (context, index) {
+                return _messages[index];
+              },
             ),
-          ],
-        ),
+          ),
+          if (_isLoading)
+            const Padding(
+              padding: EdgeInsets.all(8.0),
+              child: CircularProgressIndicator(),
+            ),
+          const Divider(height: 1.0),
+          Container(
+            decoration: BoxDecoration(
+              color: Theme.of(context).cardColor,
+            ),
+            child: _buildTextComposer(),
+          ),
+        ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
+    );
+  }
+
+  Widget _buildTextComposer() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 8.0),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _textController,
+              onSubmitted: _handleSubmitted,
+              decoration: const InputDecoration.collapsed(
+                hintText: 'メッセージを入力...',
+              ),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.send),
+            onPressed: () => _handleSubmitted(_textController.text),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _textController.dispose();
+    super.dispose();
+  }
+}
+
+class ChatMessage extends StatelessWidget {
+  final String text;
+  final bool isUser;
+
+  const ChatMessage({
+    super.key,
+    required this.text,
+    required this.isUser,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 10.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            margin: const EdgeInsets.only(right: 16.0),
+            child: CircleAvatar(
+              child: Text(isUser ? 'U' : 'A'),
+            ),
+          ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isUser ? 'ユーザー' : 'アシスタント',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                Container(
+                  margin: const EdgeInsets.only(top: 5.0),
+                  child: Text(text),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
