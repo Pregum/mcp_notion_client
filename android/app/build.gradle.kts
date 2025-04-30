@@ -6,6 +6,7 @@ plugins {
 }
 
 android {
+    ndkVersion = "27.0.12077973"
     namespace = "com.example.mcp_notion_client"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion

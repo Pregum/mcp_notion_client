@@ -16,9 +16,9 @@ late GenerativeModel geminiModel;
 late GeminiMcpBridge bridge;
 
 Future<void> prepareGemini() async {
-  // Gemini 2.5 Pro は Function Calling がデフォルト有効。
+  // Gemini Pro は Function Calling がデフォルト有効。
   geminiModel = GenerativeModel(
-    model: 'gemini-2.5-pro',
+    model: 'models/gemini-2.0-flash',
     apiKey: const String.fromEnvironment('GEMINI_API_KEY'),
   );
 }

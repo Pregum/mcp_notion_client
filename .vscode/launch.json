@@ -8,7 +8,9 @@
     {
       "name": "mcp_notion_client",
       "request": "launch",
-      "type": "dart"
+      "type": "dart",
+      "program": "lib/main.dart",
+      "args": ["--dart-define-from-file=.env"]
     }
   ]
 }
