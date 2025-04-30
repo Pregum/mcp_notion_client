@@ -4,10 +4,10 @@ import 'package:mcp_client/mcp_client.dart';
 import 'gemini_mcp_bridge.dart';
 
 Future<void> main() async {
-  // 2. MCPクライアントの初期化
-  await setupMcpClient();
   // 3. Gemini モデルの用意
   await prepareGemini();
+  // 2. MCPクライアントの初期化
+  await setupMcpClient();
   runApp(const MyApp());
 }
 
@@ -39,11 +39,9 @@ Future<void> setupMcpClient() async {
   //   },
   // );
   final transport = await McpClient.createSseTransport(
-    serverUrl: 'http://192.168.11.35:8080/sse',
-    headers: {
-      'Authorization':
-          'Bearer ${const String.fromEnvironment('NOTION_API_KEY')}',
-    },
+    // serverUrl: 'http://aystation.ai/mcp/PsFg0nTZLOCVTRdrol9yM',
+    serverUrl: 'http://${const String.fromEnvironment('SERVER_IP', defaultValue: '192.168.11.35')}:8000/sse',
+    //  const Duration(seconds: 30),
   );
   await mcpClient.connect(transport);
 
@@ -95,9 +93,10 @@ class _ChatScreenState extends State<ChatScreen> {
         _messages.add(ChatMessage(text: response, isUser: false));
         _isLoading = false;
       });
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('エラーが発生しました: $e, $stackTrace');
       setState(() {
-        _messages.add(ChatMessage(text: 'エラーが発生しました: $e', isUser: false));
+        _messages.add(ChatMessage(text: 'エラーが発生しました: $e, $stackTrace', isUser: false));
         _isLoading = false;
       });
     }
