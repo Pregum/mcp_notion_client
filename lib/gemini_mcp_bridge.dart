@@ -1,5 +1,6 @@
 import 'package:mcp_client/mcp_client.dart' as mcp_client;
 import 'package:google_generative_ai/google_generative_ai.dart' as gemini;
+import 'dart:convert';
 
 class GeminiMcpBridge {
   final mcp_client.Client mcp;
@@ -9,33 +10,61 @@ class GeminiMcpBridge {
 
   /// ユーザー入力を渡して最終テキストを返す
   Future<String> chat(String userPrompt) async {
-    // 1) MCP のツール定義を Gemini 用に変換
-    final geminiTools = _toGeminiTools(await mcp.listTools());
+    try {
+      // 1) MCP のツール定義を Gemini 用に変換
+      final geminiTools = _toGeminiTools(await mcp.listTools());
 
-    // 2) LLM へ投げる（ユーザー発話）
-    final first = await model.generateContent(
-      [gemini.Content.text(userPrompt)],
-      tools: geminiTools,
-    );
+      // 2) LLM へ投げる（ユーザー発話）
+      final first = await model.generateContent(
+        [gemini.Content.text(userPrompt)],
+        tools: geminiTools,
+      );
 
-    // 3) 関数呼び出しがあるか確認
-    final call =
-        first.functionCalls.isNotEmpty ? first.functionCalls.first : null;
-    if (call == null) return first.text ?? '';
+      // 3) 関数呼び出しがあるか確認
+      final call =
+          first.functionCalls.isNotEmpty ? first.functionCalls.first : null;
+      if (call == null) return first.text ?? '';
 
-    // 4) MCP ツールを実行
-    final toolResult = await mcp.callTool(call.name, call.args);
+      // 4) MCP ツールを実行
+      final toolResult = await mcp.callTool(call.name, call.args);
+      
+      // デバッグ用のログ出力
+      print('Tool Result Content: ${toolResult.content}');
+      final resultJson = toolResult.content.map((e) => e.toJson()).toList();
+      print('Result JSON: $resultJson');
 
-    // 5) 実行結果を LLM に返し、要約を生成
-    final followUp = await model.generateContent([
-      gemini.Content.model([call]), // モデル視点の呼び出し履歴
-      gemini.Content.functionResponse(
-        call.name,
-        {'result': toolResult.content.map((e) => e.toJson())}, // Map<String,dynamic> 形式で渡す
-      ),
-    ]);
+      // エラーチェック
+      if (resultJson.isNotEmpty && resultJson[0]['text'] != null) {
+        final errorText = resultJson[0]['text'];
+        if (errorText is String) {
+          try {
+            final errorJson = json.decode(errorText);
+            if (errorJson['code'] == 'unauthorized') {
+              return 'NotionのAPIトークンが無効です。有効なAPIトークンを設定してください。';
+            }
+          } catch (e) {
+            // JSON解析エラーは無視
+          }
+        }
+      }
 
-    return followUp.text ?? '';
+      // 5) 実行結果を LLM に返し、要約を生成
+      final followUp = await model.generateContent([
+        gemini.Content.text('以下の実行結果を日本語で分かりやすく要約してください：'),
+        gemini.Content.model([call]),
+        gemini.Content.functionResponse(
+          call.name,
+          {
+            'result': resultJson,
+          },
+        ),
+      ]);
+
+      return followUp.text ?? 'レスポンスを生成できませんでした。';
+    } catch (e, stackTrace) {
+      print('Error in chat: $e\n$stackTrace');
+      return 'エラーが発生しました: $e';
+    }
   }
 
   /// MCP → Gemini ツール変換

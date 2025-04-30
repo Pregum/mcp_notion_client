@@ -25,23 +25,17 @@ Future<void> prepareGemini() async {
 
 Future<void> setupMcpClient() async {
   mcpClient = McpClient.createClient(
-    name: 'MuseumJourney',
+    name: 'gemini-mcp-client',
     version: '1.0.0',
     capabilities: ClientCapabilities(sampling: true),
   );
 
-  // final transport = await McpClient.createStdioTransport(
-  //   command: 'npx',
-  //   arguments: ['-y', '@notionhq/notion-mcp-server'],
-  //   workingDirectory: './',
-  //   environment: {
-  //     'NOTION_API_KEY': const String.fromEnvironment('NOTION_API_KEY'),
-  //   },
-  // );
   final transport = await McpClient.createSseTransport(
-    // serverUrl: 'http://aystation.ai/mcp/PsFg0nTZLOCVTRdrol9yM',
-    serverUrl: 'http://${const String.fromEnvironment('SERVER_IP', defaultValue: '192.168.11.35')}:8000/sse',
-    //  const Duration(seconds: 30),
+    serverUrl: 'http://${const String.fromEnvironment('SERVER_IP')}:8000/sse',
+    headers: {
+      'Authorization': 'Bearer ${const String.fromEnvironment('NOTION_API_KEY')}',
+      'Notion-Version': '2022-06-28',
+    },
   );
   await mcpClient.connect(transport);
 
