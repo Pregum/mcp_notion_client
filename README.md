@@ -4,6 +4,9 @@
 
 mcp_clientライブラリを使用して gemini経由でNotion MCPサーバーにsse接続するサンプルアプリです。
 sse接続するサーバーは、ローカルPC上に立ててアプリはそこへ接続しています
+アプリの場合は、stdio接続ではなくsseで接続するため、Notion MCPのstdioをsseに変換するためにsupergatewayを使用しています。
+詳細はこちらの方の記事がわかりやすかったです。
+<https://notai.jp/supergateway/>
 
 ## 事前準備
 
@@ -33,6 +36,8 @@ SERVER_IP=xxx.xxx.xx.xx
 
 ### 実際に叩いた時のローカルサーバのコマンド
 
+supergatewayを使用してNotion MCPサーバーをローカルPC上で立ち上げた時のコマンドです。
+
 ```shell
 OPENAPI_MCP_HEADERS='{"Authorization":"Bearer ntn_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx","Notion-Version":"2022-06-28"}' \
 npx -y supergateway --stdio "npx -y @notionhq/notion-mcp-server"
@@ -42,8 +47,9 @@ notionのtokenは
 [インテグレーションページ](https://www.notion.so/profile/integrations)で作成したapi keyを適用してください
 また、[こちら](https://notion.notion.site/Notion-MCP-1d0efdeead058054a339ffe6b38649e1)のCursorでの設定方法の5.に記載されているように操作したいページにMCPの接続設定をしておかないと操作できないため、注意してください。
 
-### page idの取得方法
+### notion page idの取得方法
 
-こちらのページを参照してください
+Notionのページ操作をする際にpage idが必要になることがあるので
+こちらのページを参照して取得してください
 
 <https://booknotion.site/setting-pageid>
