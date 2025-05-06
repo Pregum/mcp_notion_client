@@ -6,6 +6,7 @@ import 'dart:convert';
 class GeminiMcpBridge {
   final mcp_client.Client mcp;
   final gemini.GenerativeModel model;
+  final List<gemini.Content> _chatHistory = [];
 
   GeminiMcpBridge({required this.mcp, required this.model});
 
@@ -16,14 +17,22 @@ class GeminiMcpBridge {
       final geminiTools = _toGeminiTools(await mcp.listTools());
 
       // 2) LLM へ投げる（ユーザー発話）
-      final first = await model.generateContent([
-        gemini.Content.text(userPrompt),
-      ], tools: geminiTools);
+      final userContent = gemini.Content.text(userPrompt);
+      _chatHistory.add(userContent);
+
+      final first = await model.generateContent(
+        _chatHistory,
+        tools: geminiTools,
+      );
 
       // 3) 関数呼び出しがあるか確認
       final call =
           first.functionCalls.isNotEmpty ? first.functionCalls.first : null;
-      if (call == null) return first.text ?? '';
+      if (call == null) {
+        final response = first.text ?? '';
+        _chatHistory.add(gemini.Content.text(response));
+        return response;
+      }
 
       // 4) MCP ツールを実行
       final toolResult = await mcp.callTool(call.name, call.args);
@@ -50,16 +59,24 @@ class GeminiMcpBridge {
 
       // 5) 実行結果を LLM に返し、要約を生成
       final followUp = await model.generateContent([
+        ..._chatHistory,
         gemini.Content.text('以下の実行結果を日本語で分かりやすく要約してください：'),
         gemini.Content.model([call]),
         gemini.Content.functionResponse(call.name, {'result': resultJson}),
       ]);
 
-      return followUp.text ?? 'レスポンスを生成できませんでした。';
+      final response = followUp.text ?? 'レスポンスを生成できませんでした。';
+      _chatHistory.add(gemini.Content.text(response));
+      return response;
     } catch (e, stackTrace) {
       debugPrint('Error in chat: $e\n$stackTrace');
       return 'エラーが発生しました: $e';
     }
+  }
+
+  /// チャット履歴をクリアする
+  void clearHistory() {
+    _chatHistory.clear();
   }
 
   /// MCP → Gemini ツール変換

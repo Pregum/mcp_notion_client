@@ -108,28 +108,33 @@ class _ChatScreenState extends State<ChatScreen> {
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
       body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.all(8.0),
-                itemCount: _messages.length,
-                itemBuilder: (context, index) {
-                  return _messages[index];
-                },
+        child: GestureDetector(
+          onTap: () {
+            primaryFocus?.unfocus();
+          },
+          child: Column(
+            children: [
+              Expanded(
+                child: ListView.builder(
+                  padding: const EdgeInsets.all(8.0),
+                  itemCount: _messages.length,
+                  itemBuilder: (context, index) {
+                    return _messages[index];
+                  },
+                ),
               ),
-            ),
-            if (_isLoading)
-              const Padding(
-                padding: EdgeInsets.all(8.0),
-                child: CircularProgressIndicator(),
+              if (_isLoading)
+                const Padding(
+                  padding: EdgeInsets.all(8.0),
+                  child: CircularProgressIndicator(),
+                ),
+              const Divider(height: 1.0),
+              Container(
+                decoration: BoxDecoration(color: Theme.of(context).cardColor),
+                child: _buildTextComposer(),
               ),
-            const Divider(height: 1.0),
-            Container(
-              decoration: BoxDecoration(color: Theme.of(context).cardColor),
-              child: _buildTextComposer(),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -144,6 +149,9 @@ class _ChatScreenState extends State<ChatScreen> {
             child: TextField(
               controller: _textController,
               onSubmitted: _handleSubmitted,
+              keyboardType: TextInputType.multiline,
+              textInputAction: TextInputAction.newline,
+              maxLines: null,
               decoration: const InputDecoration.collapsed(
                 hintText: 'メッセージを入力...',
               ),
