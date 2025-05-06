@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:mcp_client/mcp_client.dart' as mcp_client;
 import 'package:google_generative_ai/google_generative_ai.dart' as gemini;
 import 'dart:convert';
@@ -15,10 +16,9 @@ class GeminiMcpBridge {
       final geminiTools = _toGeminiTools(await mcp.listTools());
 
       // 2) LLM へ投げる（ユーザー発話）
-      final first = await model.generateContent(
-        [gemini.Content.text(userPrompt)],
-        tools: geminiTools,
-      );
+      final first = await model.generateContent([
+        gemini.Content.text(userPrompt),
+      ], tools: geminiTools);
 
       // 3) 関数呼び出しがあるか確認
       final call =
@@ -27,11 +27,11 @@ class GeminiMcpBridge {
 
       // 4) MCP ツールを実行
       final toolResult = await mcp.callTool(call.name, call.args);
-      
+
       // デバッグ用のログ出力
-      print('Tool Result Content: ${toolResult.content}');
+      debugPrint('Tool Result Content: ${toolResult.content}');
       final resultJson = toolResult.content.map((e) => e.toJson()).toList();
-      print('Result JSON: $resultJson');
+      debugPrint('Result JSON: $resultJson');
 
       // エラーチェック
       if (resultJson.isNotEmpty && resultJson[0]['text'] != null) {
@@ -52,17 +52,12 @@ class GeminiMcpBridge {
       final followUp = await model.generateContent([
         gemini.Content.text('以下の実行結果を日本語で分かりやすく要約してください：'),
         gemini.Content.model([call]),
-        gemini.Content.functionResponse(
-          call.name,
-          {
-            'result': resultJson,
-          },
-        ),
+        gemini.Content.functionResponse(call.name, {'result': resultJson}),
       ]);
 
       return followUp.text ?? 'レスポンスを生成できませんでした。';
     } catch (e, stackTrace) {
-      print('Error in chat: $e\n$stackTrace');
+      debugPrint('Error in chat: $e\n$stackTrace');
       return 'エラーが発生しました: $e';
     }
   }
@@ -83,7 +78,9 @@ class GeminiMcpBridge {
       }).toList();
 
   /// NotionのスキーマをGeminiのスキーマに変換
-  Map<String, gemini.Schema> _convertToGeminiSchema(Map<String, dynamic> schema) {
+  Map<String, gemini.Schema> _convertToGeminiSchema(
+    Map<String, dynamic> schema,
+  ) {
     // スキーマがプリミティブ型の場合
     if (schema['type'] != null && !schema.containsKey('properties')) {
       return {'value': _createBasicSchema(schema['type'] as String)};

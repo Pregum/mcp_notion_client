@@ -5,26 +5,25 @@ import 'gemini_mcp_bridge.dart';
 
 Future<void> main() async {
   // 3. Gemini モデルの用意
-  await prepareGemini();
+  final geminiModel = await prepareGemini();
   // 2. MCPクライアントの初期化
-  await setupMcpClient();
-  runApp(const MyApp());
+  final mcpClient = await setupMcpClient(geminiModel: geminiModel);
+  runApp(MyApp(mcpClient: mcpClient));
 }
 
-late Client mcpClient;
-late GenerativeModel geminiModel;
 late GeminiMcpBridge bridge;
 
-Future<void> prepareGemini() async {
+Future<GenerativeModel> prepareGemini() async {
   // Gemini Pro は Function Calling がデフォルト有効。
-  geminiModel = GenerativeModel(
+  final geminiModel = GenerativeModel(
     model: 'models/gemini-2.0-flash',
     apiKey: const String.fromEnvironment('GEMINI_API_KEY'),
   );
+  return geminiModel;
 }
 
-Future<void> setupMcpClient() async {
-  mcpClient = McpClient.createClient(
+Future<Client> setupMcpClient({required GenerativeModel geminiModel}) async {
+  final mcpClient = McpClient.createClient(
     name: 'gemini-mcp-client',
     version: '1.0.0',
     capabilities: ClientCapabilities(sampling: true),
@@ -33,7 +32,8 @@ Future<void> setupMcpClient() async {
   final transport = await McpClient.createSseTransport(
     serverUrl: 'http://${const String.fromEnvironment('SERVER_IP')}:8000/sse',
     headers: {
-      'Authorization': 'Bearer ${const String.fromEnvironment('NOTION_API_KEY')}',
+      'Authorization':
+          'Bearer ${const String.fromEnvironment('NOTION_API_KEY')}',
       'Notion-Version': '2022-06-28',
     },
   );
@@ -41,10 +41,12 @@ Future<void> setupMcpClient() async {
 
   // ブリッジの初期化
   bridge = GeminiMcpBridge(mcp: mcpClient, model: geminiModel);
+  return mcpClient;
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  const MyApp({super.key, required this.mcpClient});
+  final Client mcpClient;
 
   @override
   Widget build(BuildContext context) {
@@ -90,7 +92,9 @@ class _ChatScreenState extends State<ChatScreen> {
     } catch (e, stackTrace) {
       debugPrint('エラーが発生しました: $e, $stackTrace');
       setState(() {
-        _messages.add(ChatMessage(text: 'エラーが発生しました: $e, $stackTrace', isUser: false));
+        _messages.add(
+          ChatMessage(text: 'エラーが発生しました: $e, $stackTrace', isUser: false),
+        );
         _isLoading = false;
       });
     }
