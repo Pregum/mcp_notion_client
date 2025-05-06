@@ -72,6 +72,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _textController = TextEditingController();
   final List<ChatMessage> _messages = [];
   bool _isLoading = false;
+  final ScrollController _scrollController = ScrollController();
 
   void _handleSubmitted(String text) async {
     if (text.isEmpty) return;
@@ -80,6 +81,7 @@ class _ChatScreenState extends State<ChatScreen> {
       _messages.add(ChatMessage(text: text, isUser: true));
       _isLoading = true;
     });
+    _scrollToBottom();
 
     _textController.clear();
 
@@ -89,6 +91,7 @@ class _ChatScreenState extends State<ChatScreen> {
         _messages.add(ChatMessage(text: response, isUser: false));
         _isLoading = false;
       });
+      _scrollToBottom();
     } catch (e, stackTrace) {
       debugPrint('エラーが発生しました: $e, $stackTrace');
       setState(() {
@@ -97,16 +100,26 @@ class _ChatScreenState extends State<ChatScreen> {
         );
         _isLoading = false;
       });
+      _scrollToBottom();
     }
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('MCP Demo'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-      ),
+      appBar: AppBar(title: const Text('MCP Demo')),
       body: SafeArea(
         child: GestureDetector(
           onTap: () {
@@ -116,6 +129,7 @@ class _ChatScreenState extends State<ChatScreen> {
             children: [
               Expanded(
                 child: ListView.builder(
+                  controller: _scrollController,
                   padding: const EdgeInsets.all(8.0),
                   itemCount: _messages.length,
                   itemBuilder: (context, index) {
@@ -169,6 +183,7 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void dispose() {
     _textController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 }
