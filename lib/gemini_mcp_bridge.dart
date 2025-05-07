@@ -15,6 +15,9 @@ class GeminiMcpBridge {
     try {
       // 1) MCP のツール定義を Gemini 用に変換
       final geminiTools = _toGeminiTools(await mcp.listTools());
+      debugPrint(
+        'Gemini Tools: ${geminiTools.map((e) => e.functionDeclarations?.firstOrNull?.name)}',
+      );
 
       // 2) LLM へ投げる（ユーザー発話）
       final userContent = gemini.Content.text(userPrompt);
@@ -24,6 +27,43 @@ class GeminiMcpBridge {
         _chatHistory,
         tools: geminiTools,
       );
+
+      // デバッグ出力を追加
+      debugPrint('=== GenerateContentResponse ===');
+      debugPrint('Candidates: ${first.candidates.length}件');
+      for (var i = 0; i < first.candidates.length; i++) {
+        final candidate = first.candidates[i];
+        debugPrint('Candidate $i:');
+        debugPrint('  - Text: ${candidate.text}');
+        debugPrint('  - Finish Reason: ${candidate.finishReason}');
+        debugPrint('  - Finish Message: ${candidate.finishMessage}');
+        if (candidate.safetyRatings != null) {
+          debugPrint('  - Safety Ratings:');
+          for (final rating in candidate.safetyRatings!) {
+            debugPrint('    * Category: ${rating.category}, Probability: ${rating.probability}');
+          }
+        }
+      }
+
+      if (first.promptFeedback != null) {
+        debugPrint('Prompt Feedback:');
+        debugPrint('  - Block Reason: ${first.promptFeedback?.blockReason}');
+        debugPrint('  - Block Reason Message: ${first.promptFeedback?.blockReasonMessage}');
+        if (first.promptFeedback?.safetyRatings.isNotEmpty ?? false) {
+          debugPrint('  - Safety Ratings:');
+          for (final rating in first.promptFeedback!.safetyRatings) {
+            debugPrint('    * Category: ${rating.category}, Probability: ${rating.probability}');
+          }
+        }
+      }
+
+      if (first.usageMetadata != null) {
+        debugPrint('Usage Metadata:');
+        debugPrint('  - Prompt Token Count: ${first.usageMetadata?.promptTokenCount}');
+        debugPrint('  - Candidates Token Count: ${first.usageMetadata?.candidatesTokenCount}');
+        debugPrint('  - Total Token Count: ${first.usageMetadata?.totalTokenCount}');
+      }
+      debugPrint('===========================');
 
       // 3) 関数呼び出しがあるか確認
       final call =
@@ -48,8 +88,25 @@ class GeminiMcpBridge {
         if (errorText is String) {
           try {
             final errorJson = json.decode(errorText);
-            if (errorJson['code'] == 'unauthorized') {
-              return 'NotionのAPIトークンが無効です。有効なAPIトークンを設定してください。';
+            debugPrint('Error JSON - service: ${errorJson['service']}');
+            // サービスごとのエラーハンドリング
+            switch (errorJson['service']) {
+              case 'notion':
+                if (errorJson['code'] == 'unauthorized') {
+                  return 'NotionのAPIトークンが無効です。有効なAPIトークンを設定してください。';
+                }
+                break;
+
+              case 'spotify':
+                if (errorJson['code'] == 'unauthorized') {
+                  return 'Spotifyのアクセストークンが無効です。再認証が必要です。';
+                } else if (errorJson['code'] == 'rate_limit') {
+                  return 'Spotifyのレート制限に達しました。しばらく待ってから再試行してください。';
+                }
+                break;
+
+              default:
+                return 'エラーが発生しました: ${errorJson['message']}';
             }
           } catch (e) {
             // JSON解析エラーは無視
