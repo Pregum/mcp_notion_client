@@ -21,18 +21,6 @@ class _ChatScreenState extends State<ChatScreen> {
   final ScrollController _scrollController = ScrollController();
   late McpClientManager _mcpManager;
   late GeminiMcpBridge _bridge;
-  final List<McpServerStatus> _serverStatuses = [
-    McpServerStatus(
-      name: 'Notion MCP',
-      url: 'http://${const String.fromEnvironment('SERVER_IP')}:8000/sse',
-      headers: {},
-    ),
-    McpServerStatus(
-      name: 'Spotify MCP',
-      url: 'http://${const String.fromEnvironment('SERVER_IP')}:8001/sse',
-      headers: {},
-    ),
-  ];
 
   @override
   void initState() {
@@ -59,7 +47,7 @@ class _ChatScreenState extends State<ChatScreen> {
     });
 
     // 各サーバーに接続を試みる
-    for (final status in _serverStatuses) {
+    for (final status in _mcpManager.serverStatuses) {
       await _mcpManager.connectToServer(status);
       setState(() {}); // UIを更新
     }
@@ -142,25 +130,20 @@ class _ChatScreenState extends State<ChatScreen> {
         error: null,
       );
 
-      setState(() {
-        _serverStatuses.add(serverStatus);
-      });
-
       await _mcpManager.addServer(
         serverStatus,
         name: result['name'],
         url: result['url'],
         headers: result['headers'],
       );
+      setState(() {}); // UIを更新
     }
   }
 
   Future<void> _deleteServer(String serverName) async {
     try {
       await _mcpManager.removeServer(serverName);
-      setState(() {
-        _serverStatuses.removeWhere((s) => s.name == serverName);
-      });
+      setState(() {}); // UIを更新
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -194,7 +177,7 @@ class _ChatScreenState extends State<ChatScreen> {
           child: Column(
             children: [
               ServerStatusPanel(
-                serverStatuses: _serverStatuses,
+                serverStatuses: _mcpManager.serverStatuses,
                 onRefresh: _initializeMcpClient,
                 onDelete: _deleteServer,
               ),
