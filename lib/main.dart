@@ -5,14 +5,14 @@ import 'gemini_mcp_bridge.dart';
 import 'package:http/http.dart' as http;
 
 Future<void> main() async {
-  // 3. Gemini モデルの用意
-  final geminiModel = await prepareGemini();
-  // 2. MCPクライアントの初期化
-  final mcpClient = await setupMcpClient(geminiModel: geminiModel);
-  runApp(MyApp(mcpClient: mcpClient));
+  // // 3. Gemini モデルの用意
+  // final geminiModel = await prepareGemini();
+  // // 2. MCPクライアントの初期化
+  // final mcpClient = await setupMcpClient(geminiModel: geminiModel);
+  runApp(const MyApp());
 }
 
-late GeminiMcpBridge bridge;
+// late GeminiMcpBridge bridge;
 
 Future<GenerativeModel> prepareGemini() async {
   // Gemini Pro は Function Calling がデフォルト有効。
@@ -23,73 +23,20 @@ Future<GenerativeModel> prepareGemini() async {
   return geminiModel;
 }
 
-Future<Client> setupMcpClient({required GenerativeModel geminiModel}) async {
+Future<GeminiMcpBridge> setupMcpClient({required GenerativeModel geminiModel}) async {
   final mcpClient = McpClient.createClient(
     name: 'gemini-mcp-client',
     version: '1.0.0',
     capabilities: ClientCapabilities(sampling: true),
   );
 
-  try {
-    // Notion用のトランスポート
-    final notionTransport = await McpClient.createSseTransport(
-      serverUrl: 'http://${const String.fromEnvironment('SERVER_IP')}:8000/sse',
-      headers: {
-        'Authorization':
-            'Bearer ${const String.fromEnvironment('NOTION_API_KEY')}',
-        'Notion-Version': '2022-06-28',
-      },
-    );
-
-    // // Spotify用のトランスポート
-    // final spotifyTransport = await McpClient.createSseTransport(
-    //   serverUrl: 'http://${const String.fromEnvironment('SERVER_IP')}:8001/sse',
-    //   headers: {
-    //     'Authorization':
-    //         'Bearer ${const String.fromEnvironment('SPOTIFY_ACCESS_TOKEN')}',
-    //   },
-    // );
-
-    // 各トランスポートの接続を個別に試みる
-    try {
-      await mcpClient.connect(notionTransport).timeout(
-        const Duration(seconds: 10),
-        onTimeout: () {
-          throw McpError('Notion connection timeout');
-        },
-      );
-      debugPrint('Notion MCP connected successfully');
-    } catch (e) {
-      debugPrint('Notion MCP connection failed: $e');
-      // Notionの接続失敗は続行
-    }
-
-    // try {
-    //   await mcpClient.connect(spotifyTransport).timeout(
-    //     const Duration(seconds: 10),
-    //     onTimeout: () {
-    //       throw McpError('Spotify connection timeout');
-    //     },
-    //   );
-    //   debugPrint('Spotify MCP connected successfully');
-    // } catch (e) {
-    //   debugPrint('Spotify MCP connection failed: $e');
-    //   // Spotifyの接続失敗は続行
-    // }
-
-    // ブリッジの初期化
-    bridge = GeminiMcpBridge(mcp: mcpClient, model: geminiModel);
-    return mcpClient;
-  } catch (e) {
-    debugPrint('MCP Client setup error: $e');
-    // エラーが発生してもクライアントを返す
-    return mcpClient;
-  }
+  // ブリッジの初期化
+  final bridge = GeminiMcpBridge(mcp: mcpClient, model: geminiModel);
+  return bridge;
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key, required this.mcpClient});
-  final Client mcpClient;
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -131,6 +78,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final List<ChatMessage> _messages = [];
   bool _isLoading = false;
   final ScrollController _scrollController = ScrollController();
+  late GeminiMcpBridge bridge;
   final List<McpServerStatus> _serverStatuses = [
     McpServerStatus(
       name: 'Notion MCP',
@@ -145,23 +93,48 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
-    _checkServerStatus();
+    _initializeMcpServers();
   }
 
-  Future<void> _checkServerStatus() async {
-    for (var status in _serverStatuses) {
+  Future<void> _initializeMcpServers() async {
+    final geminiModel = await prepareGemini();
+    bridge = await setupMcpClient(geminiModel: geminiModel);
+    try {
+      // Notion用のトランスポート
+      final notionTransport = await McpClient.createSseTransport(
+        serverUrl: 'http://${const String.fromEnvironment('SERVER_IP')}:8000/sse',
+        headers: {
+          'Authorization':
+              'Bearer ${const String.fromEnvironment('NOTION_API_KEY')}',
+          'Notion-Version': '2022-06-28',
+        },
+      );
+
       try {
-        final response = await http.get(Uri.parse(status.url));
+        await bridge.mcp.connect(notionTransport).timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            throw McpError('Notion connection timeout');
+          },
+        );
+        debugPrint('Notion MCP connected successfully');
         setState(() {
-          status.isConnected = response.statusCode == 200;
-          status.error = null;
+          _serverStatuses[0].isConnected = true;
+          _serverStatuses[0].error = null;
         });
       } catch (e) {
+        debugPrint('Notion MCP connection failed: $e');
         setState(() {
-          status.isConnected = false;
-          status.error = e.toString();
+          _serverStatuses[0].isConnected = false;
+          _serverStatuses[0].error = e.toString();
         });
       }
+    } catch (e) {
+      debugPrint('MCP Client setup error: $e');
+      setState(() {
+        _serverStatuses[0].isConnected = false;
+        _serverStatuses[0].error = e.toString();
+      });
     }
   }
 
@@ -233,7 +206,7 @@ class _ChatScreenState extends State<ChatScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: _checkServerStatus,
+            onPressed: _initializeMcpServers,
             tooltip: 'サーバー状態を更新',
           ),
         ],
