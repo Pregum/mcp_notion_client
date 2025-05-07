@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mcp_client/mcp_client.dart';
 import '../models/mcp_server_status.dart';
+import 'package:collection/collection.dart';
 
 class McpClientManager {
   final List<McpClientInfo> _clients = [];
@@ -43,6 +44,8 @@ class McpClientManager {
       headers: headers,
     );
 
+    _serverStatuses.add(status);
+
     try {
       final client = McpClient.createClient(
         name: 'gemini-mcp-client-${name.toLowerCase()}',
@@ -69,7 +72,6 @@ class McpClientManager {
         client: client,
         status: status,
       ));
-      _serverStatuses.add(status);
 
       status.isConnected = true;
       status.error = null;
@@ -78,19 +80,21 @@ class McpClientManager {
       status.isConnected = false;
       status.error = e.toString();
       debugPrint('$name MCP connection failed: $e');
-      rethrow;
+      // エラーが発生してもサーバーは追加されたままにする
     }
   }
 
   Future<void> removeServer(String name) async {
-    final index = _clients.indexWhere((s) => s.name == name);
+    final index = _serverStatuses.indexWhere((s) => s.name == name);
     if (index == -1) {
       throw Exception('Server with name "$name" not found');
     }
 
-    final clientInfo = _clients.firstWhere((c) => c.name == name);
-    clientInfo.client.disconnect();
-    _clients.remove(clientInfo);
+    final clientInfo = _clients.firstWhereOrNull((c) => c.name == name);
+    if (clientInfo != null) {
+      clientInfo.client.disconnect();
+      _clients.remove(clientInfo);
+    }
     _serverStatuses.removeAt(index);
   }
 
