@@ -133,16 +133,16 @@ class _ChatScreenState extends State<ChatScreen> {
       final serverStatus = McpServerStatus(
         name: result['name'],
         url: result['url'],
-        headers: result['headers'],
+        headers: Map<String, String>.from(result['headers'] as Map),
         isConnected: false,
         error: null,
       );
 
       await _mcpManager.addServer(
-      serverStatus,
+        serverStatus,
         name: result['name'],
         url: result['url'],
-        headers: result['headers'],
+        headers: Map<String, String>.from(result['headers'] as Map),
       );
       setState(() {}); // UIを更新
     }
