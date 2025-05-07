@@ -104,7 +104,7 @@ class _AddServerDialogState extends State<AddServerDialog> {
                     return 'サーバーURLを入力してください';
                   }
                   final uri = Uri.tryParse(value);
-                  if (uri == null || !uri.hasAbsolutePath) {
+                  if (uri == null) {
                     return '有効なURLを入力してください';
                   }
                   if (!uri.scheme.startsWith('http')) {
@@ -123,14 +123,8 @@ class _AddServerDialogState extends State<AddServerDialog> {
               TextFormField(
                 controller: _authTokenController,
                 decoration: const InputDecoration(
-                  labelText: '認証トークン',
+                  labelText: '認証トークン（任意）',
                 ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return '認証トークンを入力してください';
-                  }
-                  return null;
-                },
               ),
             ],
           ),
@@ -145,13 +139,16 @@ class _AddServerDialogState extends State<AddServerDialog> {
           onPressed: () {
             if (_formKey.currentState!.validate()) {
               final template = _serverTemplates[_selectedServerType]!;
+              final headers = _authTokenController.text.isNotEmpty
+                  ? {
+                      template['authHeader']!:
+                          '${template['authPrefix']!}${_authTokenController.text}',
+                    }
+                  : {};
               Navigator.of(context).pop({
                 'name': _nameController.text,
                 'url': _urlController.text,
-                'headers': {
-                  template['authHeader']!:
-                      '${template['authPrefix']!}${_authTokenController.text}',
-                },
+                'headers': headers,
               });
             }
           },
