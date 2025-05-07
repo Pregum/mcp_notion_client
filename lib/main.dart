@@ -30,7 +30,8 @@ Future<Client> setupMcpClient({required GenerativeModel geminiModel}) async {
   );
 
   try {
-    final transport = await McpClient.createSseTransport(
+    // Notion用のトランスポート
+    final notionTransport = await McpClient.createSseTransport(
       serverUrl: 'http://${const String.fromEnvironment('SERVER_IP')}:8000/sse',
       headers: {
         'Authorization':
@@ -39,13 +40,30 @@ Future<Client> setupMcpClient({required GenerativeModel geminiModel}) async {
       },
     );
 
-    // 接続を試みる
-    await mcpClient.connect(transport).timeout(
-      const Duration(seconds: 10),
-      onTimeout: () {
-        throw McpError('Connection timeout');
+    // Spotify用のトランスポート
+    final spotifyTransport = await McpClient.createSseTransport(
+      serverUrl: 'http://${const String.fromEnvironment('SERVER_IP')}:8001/sse',
+      headers: {
+        'Authorization':
+            'Bearer ${const String.fromEnvironment('SPOTIFY_ACCESS_TOKEN')}',
       },
     );
+
+    // 両方のトランスポートに接続を試みる
+    await Future.wait([
+      mcpClient.connect(notionTransport).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw McpError('Notion connection timeout');
+        },
+      ),
+      mcpClient.connect(spotifyTransport).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw McpError('Spotify connection timeout');
+        },
+      ),
+    ]);
 
     // ブリッジの初期化
     bridge = GeminiMcpBridge(mcp: mcpClient, model: geminiModel);
