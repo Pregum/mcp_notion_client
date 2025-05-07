@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'chat_screen.dart';
+import 'package:mcp_notion_client/screens/chat_screen.dart';
 
 Future<void> main() async {
   runApp(const MyApp());

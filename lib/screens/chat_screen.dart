@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
-import 'package:mcp_client/mcp_client.dart';
-import 'gemini_mcp_bridge.dart';
-import 'chat_message.dart';
-import 'server_status_panel.dart';
-import 'mcp_client_manager.dart';
-import 'add_server_dialog.dart';
+import 'package:mcp_notion_client/models/mcp_server_status.dart';
+import '../services/gemini_mcp_bridge.dart';
+import '../models/chat_message.dart';
+import '../components/server_status_panel.dart';
+import '../services/mcp_client_manager.dart';
+import '../components/add_server_dialog.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -131,7 +131,7 @@ class _ChatScreenState extends State<ChatScreen> {
       );
 
       await _mcpManager.addServer(
-        serverStatus,
+      serverStatus,
         name: result['name'],
         url: result['url'],
         headers: result['headers'],

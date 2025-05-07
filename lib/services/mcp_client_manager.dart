@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mcp_client/mcp_client.dart';
-import 'server_status_panel.dart';
+import '../models/mcp_server_status.dart';
 
 class McpClientManager {
   final List<McpClientInfo> _clients = [];
