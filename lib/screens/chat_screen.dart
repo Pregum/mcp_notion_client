@@ -18,6 +18,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _textController = TextEditingController();
   final List<ChatMessage> _messages = [];
   bool _isLoading = false;
+  bool _isInitializing = true;  // 初期化状態を管理するフラグを追加
   final ScrollController _scrollController = ScrollController();
   late McpClientManager _mcpManager;
   late GeminiMcpBridge _bridge;
@@ -37,19 +38,26 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _initializeMcpClient() async {
-    final geminiModel = await prepareGemini();
-    _mcpManager = McpClientManager();
-    _bridge = GeminiMcpBridge(mcpManager: _mcpManager, model: geminiModel);
-    _bridge.clearHistory();
-
     setState(() {
-      _messages.clear();
+      _isInitializing = true;
     });
 
-    // 各サーバーに接続を試みる
-    for (final status in _mcpManager.serverStatuses) {
-      await _mcpManager.connectToServer(status);
-      setState(() {}); // UIを更新
+    try {
+      final geminiModel = await prepareGemini();
+      _mcpManager = McpClientManager();
+      _bridge = GeminiMcpBridge(mcpManager: _mcpManager, model: geminiModel);
+      _bridge.clearHistory();
+
+      // 各サーバーに接続を試みる
+      for (final status in _mcpManager.serverStatuses) {
+        await _mcpManager.connectToServer(status);
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isInitializing = false;
+        });
+      }
     }
   }
 
@@ -158,6 +166,24 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isInitializing) {
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 16),
+              Text(
+                'MCPクライアントを初期化中...',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('MCP Chat'),
