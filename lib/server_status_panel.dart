@@ -17,7 +17,7 @@ class McpServerStatus {
   });
 }
 
-class ServerStatusPanel extends StatelessWidget {
+class ServerStatusPanel extends StatefulWidget {
   final List<McpServerStatus> serverStatuses;
   final VoidCallback onRefresh;
 
@@ -26,6 +26,13 @@ class ServerStatusPanel extends StatelessWidget {
     required this.serverStatuses,
     required this.onRefresh,
   });
+
+  @override
+  State<ServerStatusPanel> createState() => _ServerStatusPanelState();
+}
+
+class _ServerStatusPanelState extends State<ServerStatusPanel> {
+  bool _isExpanded = true;
 
   @override
   Widget build(BuildContext context) {
@@ -48,7 +55,7 @@ class ServerStatusPanel extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Text(
-                '(${serverStatuses.where((s) => s.isConnected).length}/${serverStatuses.length} 接続中)',
+                '(${widget.serverStatuses.where((s) => s.isConnected).length}/${widget.serverStatuses.length} 接続中)',
                 style: TextStyle(
                   fontSize: 14,
                   color: Theme.of(context).colorScheme.secondary,
@@ -56,49 +63,60 @@ class ServerStatusPanel extends StatelessWidget {
               ),
               const Spacer(),
               IconButton(
+                icon: Icon(_isExpanded ? Icons.expand_less : Icons.expand_more),
+                onPressed: () {
+                  setState(() {
+                    _isExpanded = !_isExpanded;
+                  });
+                },
+                tooltip: _isExpanded ? 'パネルを収納' : 'パネルを展開',
+              ),
+              IconButton(
                 icon: const Icon(Icons.refresh),
-                onPressed: onRefresh,
+                onPressed: widget.onRefresh,
                 tooltip: 'サーバー状態を更新',
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          ...serverStatuses.map(
-            (status) => Padding(
-              padding: const EdgeInsets.only(bottom: 4.0),
-              child: Row(
-                children: [
-                  Icon(
-                    status.isConnected ? Icons.check_circle : Icons.error,
-                    color: status.isConnected ? Colors.green : Colors.red,
-                    size: 16,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          status.name,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        if (status.error != null)
+          if (_isExpanded) ...[
+            const SizedBox(height: 8),
+            ...widget.serverStatuses.map(
+              (status) => Padding(
+                padding: const EdgeInsets.only(bottom: 4.0),
+                child: Row(
+                  children: [
+                    Icon(
+                      status.isConnected ? Icons.check_circle : Icons.error,
+                      color: status.isConnected ? Colors.green : Colors.red,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                           Text(
-                            status.error!,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.red[700],
+                            status.name,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
-                      ],
+                          if (status.error != null)
+                            Text(
+                              status.error!,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.red[700],
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
+          ],
         ],
       ),
     );
