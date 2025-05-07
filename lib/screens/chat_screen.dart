@@ -47,6 +47,7 @@ class _ChatScreenState extends State<ChatScreen> {
       _mcpManager = McpClientManager();
       _bridge = GeminiMcpBridge(mcpManager: _mcpManager, model: geminiModel);
       _bridge.clearHistory();
+      _messages.clear();
 
       // 各サーバーに接続を試みる
       for (final status in _mcpManager.serverStatuses) {
