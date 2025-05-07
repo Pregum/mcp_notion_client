@@ -3,21 +3,7 @@ import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:mcp_client/mcp_client.dart';
 import 'gemini_mcp_bridge.dart';
 import 'chat_message.dart';
-
-/// MCPサーバーの接続状態を管理するクラス
-class McpServerStatus {
-  final String name;
-  final String url;
-  bool isConnected;
-  String? error;
-
-  McpServerStatus({
-    required this.name,
-    required this.url,
-    this.isConnected = false,
-    this.error,
-  });
-}
+import 'server_status_panel.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -31,7 +17,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final List<ChatMessage> _messages = [];
   bool _isLoading = false;
   final ScrollController _scrollController = ScrollController();
-  late final GeminiMcpBridge bridge;
+  late GeminiMcpBridge bridge;
   final List<McpServerStatus> _serverStatuses = [
     McpServerStatus(
       name: 'Notion MCP',
@@ -76,6 +62,10 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _initializeMcpClient() async {
     final geminiModel = await prepareGemini();
     bridge = await setupMcpClient(geminiModel: geminiModel);
+    bridge.clearHistory();
+    setState(() {
+      _messages.clear();
+    });
     try {
       // Notion用のトランスポート
       final notionTransport = await McpClient.createSseTransport(
@@ -186,16 +176,7 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('MCP Demo'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _initializeMcpClient,
-            tooltip: 'サーバー状態を更新',
-          ),
-        ],
-      ),
+      appBar: AppBar(title: const Text('MCP Demo')),
       body: SafeArea(
         child: GestureDetector(
           onTap: () {
@@ -203,78 +184,9 @@ class _ChatScreenState extends State<ChatScreen> {
           },
           child: Column(
             children: [
-              // サーバー状態表示
-              Container(
-                padding: const EdgeInsets.all(8.0),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceVariant,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Text(
-                          'MCPサーバー状態',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          '(${_serverStatuses.where((s) => s.isConnected).length}/${_serverStatuses.length} 接続中)',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Theme.of(context).colorScheme.secondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    ..._serverStatuses.map(
-                      (status) => Padding(
-                        padding: const EdgeInsets.only(bottom: 4.0),
-                        child: Row(
-                          children: [
-                            Icon(
-                              status.isConnected
-                                  ? Icons.check_circle
-                                  : Icons.error,
-                              color:
-                                  status.isConnected
-                                      ? Colors.green
-                                      : Colors.red,
-                              size: 16,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    status.name,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                  if (status.error != null)
-                                    Text(
-                                      status.error!,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.red[700],
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+              ServerStatusPanel(
+                serverStatuses: _serverStatuses,
+                onRefresh: _initializeMcpClient,
               ),
               const Divider(),
               // 既存のチャットUI
