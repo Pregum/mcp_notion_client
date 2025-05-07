@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:mcp_client/mcp_client.dart';
 import 'gemini_mcp_bridge.dart';
+import 'package:http/http.dart' as http;
 
 Future<void> main() async {
   // 3. Gemini モデルの用意
@@ -40,40 +41,49 @@ Future<Client> setupMcpClient({required GenerativeModel geminiModel}) async {
       },
     );
 
-    // Spotify用のトランスポート
-    final spotifyTransport = await McpClient.createSseTransport(
-      serverUrl: 'http://${const String.fromEnvironment('SERVER_IP')}:8001/sse',
-      headers: {
-        'Authorization':
-            'Bearer ${const String.fromEnvironment('SPOTIFY_ACCESS_TOKEN')}',
-      },
-    );
+    // // Spotify用のトランスポート
+    // final spotifyTransport = await McpClient.createSseTransport(
+    //   serverUrl: 'http://${const String.fromEnvironment('SERVER_IP')}:8001/sse',
+    //   headers: {
+    //     'Authorization':
+    //         'Bearer ${const String.fromEnvironment('SPOTIFY_ACCESS_TOKEN')}',
+    //   },
+    // );
 
-    // 両方のトランスポートに接続を試みる
-    await Future.wait([
-      mcpClient.connect(notionTransport).timeout(
+    // 各トランスポートの接続を個別に試みる
+    try {
+      await mcpClient.connect(notionTransport).timeout(
         const Duration(seconds: 10),
         onTimeout: () {
           throw McpError('Notion connection timeout');
         },
-      ),
-      mcpClient.connect(spotifyTransport).timeout(
-        const Duration(seconds: 10),
-        onTimeout: () {
-          throw McpError('Spotify connection timeout');
-        },
-      ),
-    ]);
+      );
+      debugPrint('Notion MCP connected successfully');
+    } catch (e) {
+      debugPrint('Notion MCP connection failed: $e');
+      // Notionの接続失敗は続行
+    }
+
+    // try {
+    //   await mcpClient.connect(spotifyTransport).timeout(
+    //     const Duration(seconds: 10),
+    //     onTimeout: () {
+    //       throw McpError('Spotify connection timeout');
+    //     },
+    //   );
+    //   debugPrint('Spotify MCP connected successfully');
+    // } catch (e) {
+    //   debugPrint('Spotify MCP connection failed: $e');
+    //   // Spotifyの接続失敗は続行
+    // }
 
     // ブリッジの初期化
     bridge = GeminiMcpBridge(mcp: mcpClient, model: geminiModel);
     return mcpClient;
   } catch (e) {
     debugPrint('MCP Client setup error: $e');
-    if (e == 202) {
-      return mcpClient;
-    }
-    rethrow;
+    // エラーが発生してもクライアントを返す
+    return mcpClient;
   }
 }
 
@@ -94,6 +104,21 @@ class MyApp extends StatelessWidget {
   }
 }
 
+/// MCPサーバーの接続状態を管理するクラス
+class McpServerStatus {
+  final String name;
+  final String url;
+  bool isConnected;
+  String? error;
+
+  McpServerStatus({
+    required this.name,
+    required this.url,
+    this.isConnected = false,
+    this.error,
+  });
+}
+
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
 
@@ -106,6 +131,39 @@ class _ChatScreenState extends State<ChatScreen> {
   final List<ChatMessage> _messages = [];
   bool _isLoading = false;
   final ScrollController _scrollController = ScrollController();
+  final List<McpServerStatus> _serverStatuses = [
+    McpServerStatus(
+      name: 'Notion MCP',
+      url: 'http://${const String.fromEnvironment('SERVER_IP')}:8000/sse',
+    ),
+    McpServerStatus(
+      name: 'Spotify MCP',
+      url: 'http://${const String.fromEnvironment('SERVER_IP')}:8001/sse',
+    ),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _checkServerStatus();
+  }
+
+  Future<void> _checkServerStatus() async {
+    for (var status in _serverStatuses) {
+      try {
+        final response = await http.get(Uri.parse(status.url));
+        setState(() {
+          status.isConnected = response.statusCode == 200;
+          status.error = null;
+        });
+      } catch (e) {
+        setState(() {
+          status.isConnected = false;
+          status.error = e.toString();
+        });
+      }
+    }
+  }
 
   void _handleSubmitted(String text) async {
     if (text.isEmpty) return;
@@ -119,6 +177,20 @@ class _ChatScreenState extends State<ChatScreen> {
     _textController.clear();
 
     try {
+      // サーバーの接続状態を確認
+      final availableServers = _serverStatuses.where((s) => s.isConnected).length;
+      if (availableServers == 0) {
+        setState(() {
+          _messages.add(ChatMessage(
+            text: '現在、MCPサーバーに接続できていません。\n'
+                'サーバーの状態を確認してください。',
+            isUser: false,
+          ));
+          _isLoading = false;
+        });
+        return;
+      }
+
       final response = await bridge.chat(text);
       setState(() {
         _messages.add(ChatMessage(text: response, isUser: false));
@@ -129,7 +201,11 @@ class _ChatScreenState extends State<ChatScreen> {
       debugPrint('エラーが発生しました: $e, $stackTrace');
       setState(() {
         _messages.add(
-          ChatMessage(text: 'エラーが発生しました: $e, $stackTrace', isUser: false),
+          ChatMessage(
+            text: 'エラーが発生しました: $e\n'
+                '一部の機能が利用できない可能性があります。',
+            isUser: false,
+          ),
         );
         _isLoading = false;
       });
@@ -152,7 +228,16 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('MCP Demo')),
+      appBar: AppBar(
+        title: const Text('MCP Demo'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _checkServerStatus,
+            tooltip: 'サーバー状態を更新',
+          ),
+        ],
+      ),
       body: SafeArea(
         child: GestureDetector(
           onTap: () {
@@ -160,6 +245,78 @@ class _ChatScreenState extends State<ChatScreen> {
           },
           child: Column(
             children: [
+              // サーバー状態表示
+              Container(
+                padding: const EdgeInsets.all(8.0),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceVariant,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Text(
+                          'MCPサーバー状態',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '(${_serverStatuses.where((s) => s.isConnected).length}/${_serverStatuses.length} 接続中)',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Theme.of(context).colorScheme.secondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    ..._serverStatuses.map((status) => Padding(
+                          padding: const EdgeInsets.only(bottom: 4.0),
+                          child: Row(
+                            children: [
+                              Icon(
+                                status.isConnected
+                                    ? Icons.check_circle
+                                    : Icons.error,
+                                color: status.isConnected
+                                    ? Colors.green
+                                    : Colors.red,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      status.name,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    if (status.error != null)
+                                      Text(
+                                        status.error!,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.red[700],
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        )),
+                  ],
+                ),
+              ),
+              const Divider(),
+              // 既存のチャットUI
               Expanded(
                 child: ListView.builder(
                   controller: _scrollController,

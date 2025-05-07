@@ -40,7 +40,9 @@ class GeminiMcpBridge {
         if (candidate.safetyRatings != null) {
           debugPrint('  - Safety Ratings:');
           for (final rating in candidate.safetyRatings!) {
-            debugPrint('    * Category: ${rating.category}, Probability: ${rating.probability}');
+            debugPrint(
+              '    * Category: ${rating.category}, Probability: ${rating.probability}',
+            );
           }
         }
       }
@@ -48,20 +50,30 @@ class GeminiMcpBridge {
       if (first.promptFeedback != null) {
         debugPrint('Prompt Feedback:');
         debugPrint('  - Block Reason: ${first.promptFeedback?.blockReason}');
-        debugPrint('  - Block Reason Message: ${first.promptFeedback?.blockReasonMessage}');
+        debugPrint(
+          '  - Block Reason Message: ${first.promptFeedback?.blockReasonMessage}',
+        );
         if (first.promptFeedback?.safetyRatings.isNotEmpty ?? false) {
           debugPrint('  - Safety Ratings:');
           for (final rating in first.promptFeedback!.safetyRatings) {
-            debugPrint('    * Category: ${rating.category}, Probability: ${rating.probability}');
+            debugPrint(
+              '    * Category: ${rating.category}, Probability: ${rating.probability}',
+            );
           }
         }
       }
 
       if (first.usageMetadata != null) {
         debugPrint('Usage Metadata:');
-        debugPrint('  - Prompt Token Count: ${first.usageMetadata?.promptTokenCount}');
-        debugPrint('  - Candidates Token Count: ${first.usageMetadata?.candidatesTokenCount}');
-        debugPrint('  - Total Token Count: ${first.usageMetadata?.totalTokenCount}');
+        debugPrint(
+          '  - Prompt Token Count: ${first.usageMetadata?.promptTokenCount}',
+        );
+        debugPrint(
+          '  - Candidates Token Count: ${first.usageMetadata?.candidatesTokenCount}',
+        );
+        debugPrint(
+          '  - Total Token Count: ${first.usageMetadata?.totalTokenCount}',
+        );
       }
       debugPrint('===========================');
 
