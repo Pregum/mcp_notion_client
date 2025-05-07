@@ -17,10 +17,10 @@ class GeminiMcpBridge {
   /// ユーザー入力を渡して最終テキストを返す
   Future<String> chat(String userPrompt) async {
     try {
-      // 接続されているMCPクライアントがない場合はエラー
-      if (!_mcpManager.isAnyServerConnected()) {
-        throw Exception('No connected MCP servers available');
-      }
+      // // 接続されているMCPクライアントがない場合はエラー
+      // if (!_mcpManager.isAnyServerConnected()) {
+      //   throw Exception('No connected MCP servers available');
+      // }
 
       // 1) 接続されている全てのMCPクライアントからツール定義を取得
       final allTools = <mcp_client.Tool>[];

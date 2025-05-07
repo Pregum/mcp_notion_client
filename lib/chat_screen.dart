@@ -77,20 +77,20 @@ class _ChatScreenState extends State<ChatScreen> {
     _textController.clear();
 
     try {
-      if (!_mcpManager.isAnyServerConnected()) {
-        setState(() {
-          _messages.add(
-            ChatMessage(
-              text:
-                  '現在、MCPサーバーに接続できていません。\n'
-                  'サーバーの状態を確認してください。',
-              isUser: false,
-            ),
-          );
-          _isLoading = false;
-        });
-        return;
-      }
+      // if (!_mcpManager.isAnyServerConnected()) {
+      //   setState(() {
+      //     _messages.add(
+      //       ChatMessage(
+      //         text:
+      //             '現在、MCPサーバーに接続できていません。\n'
+      //             'サーバーの状態を確認してください。',
+      //         isUser: false,
+      //       ),
+      //     );
+      //     _isLoading = false;
+      //   });
+      //   return;
+      // }
 
       final response = await _bridge.chat(text);
       setState(() {
