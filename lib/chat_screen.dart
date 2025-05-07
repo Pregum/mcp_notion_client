@@ -155,6 +155,24 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  Future<void> _deleteServer(String serverName) async {
+    try {
+      await _mcpManager.removeServer(serverName);
+      setState(() {
+        _serverStatuses.removeWhere((s) => s.name == serverName);
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('サーバーの削除に失敗しました: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -178,6 +196,7 @@ class _ChatScreenState extends State<ChatScreen> {
               ServerStatusPanel(
                 serverStatuses: _serverStatuses,
                 onRefresh: _initializeMcpClient,
+                onDelete: _deleteServer,
               ),
               const Divider(),
               // 既存のチャットUI

@@ -20,11 +20,13 @@ class McpServerStatus {
 class ServerStatusPanel extends StatefulWidget {
   final List<McpServerStatus> serverStatuses;
   final VoidCallback onRefresh;
+  final Function(String) onDelete;
 
   const ServerStatusPanel({
     super.key,
     required this.serverStatuses,
     required this.onRefresh,
+    required this.onDelete,
   });
 
   @override
@@ -112,6 +114,12 @@ class _ServerStatusPanelState extends State<ServerStatusPanel> {
                         ],
                       ),
                     ),
+                    IconButton(
+                      icon: const Icon(Icons.remove),
+                      onPressed: () => _showDeleteConfirmation(context, status.name),
+                      tooltip: 'サーバーを削除',
+                      iconSize: 20,
+                    ),
                   ],
                 ),
               ),
@@ -120,5 +128,29 @@ class _ServerStatusPanelState extends State<ServerStatusPanel> {
         ],
       ),
     );
+  }
+
+  Future<void> _showDeleteConfirmation(BuildContext context, String serverName) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('サーバーの削除'),
+        content: Text('$serverName を削除してもよろしいですか？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('キャンセル'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('削除'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      widget.onDelete(serverName);
+    }
   }
 } 
