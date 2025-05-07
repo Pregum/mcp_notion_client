@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
-import 'package:mcp_client/mcp_client.dart';
-import 'gemini_mcp_bridge.dart';
-import 'chat_message.dart';
-import 'server_status_panel.dart';
-import 'mcp_client_manager.dart';
-import 'add_server_dialog.dart';
+import 'package:mcp_notion_client/models/mcp_server_status.dart';
+import '../services/gemini_mcp_bridge.dart';
+import '../models/chat_message.dart';
+import '../components/server_status_panel.dart';
+import '../services/mcp_client_manager.dart';
+import '../components/add_server_dialog.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -21,18 +21,6 @@ class _ChatScreenState extends State<ChatScreen> {
   final ScrollController _scrollController = ScrollController();
   late McpClientManager _mcpManager;
   late GeminiMcpBridge _bridge;
-  final List<McpServerStatus> _serverStatuses = [
-    McpServerStatus(
-      name: 'Notion MCP',
-      url: 'http://${const String.fromEnvironment('SERVER_IP')}:8000/sse',
-      headers: {},
-    ),
-    McpServerStatus(
-      name: 'Spotify MCP',
-      url: 'http://${const String.fromEnvironment('SERVER_IP')}:8001/sse',
-      headers: {},
-    ),
-  ];
 
   @override
   void initState() {
@@ -59,7 +47,7 @@ class _ChatScreenState extends State<ChatScreen> {
     });
 
     // 各サーバーに接続を試みる
-    for (final status in _serverStatuses) {
+    for (final status in _mcpManager.serverStatuses) {
       await _mcpManager.connectToServer(status);
       setState(() {}); // UIを更新
     }
@@ -142,16 +130,29 @@ class _ChatScreenState extends State<ChatScreen> {
         error: null,
       );
 
-      setState(() {
-        _serverStatuses.add(serverStatus);
-      });
-
       await _mcpManager.addServer(
-        serverStatus,
+      serverStatus,
         name: result['name'],
         url: result['url'],
         headers: result['headers'],
       );
+      setState(() {}); // UIを更新
+    }
+  }
+
+  Future<void> _deleteServer(String serverName) async {
+    try {
+      await _mcpManager.removeServer(serverName);
+      setState(() {}); // UIを更新
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('サーバーの削除に失敗しました: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -176,8 +177,9 @@ class _ChatScreenState extends State<ChatScreen> {
           child: Column(
             children: [
               ServerStatusPanel(
-                serverStatuses: _serverStatuses,
+                serverStatuses: _mcpManager.serverStatuses,
                 onRefresh: _initializeMcpClient,
+                onDelete: _deleteServer,
               ),
               const Divider(),
               // 既存のチャットUI

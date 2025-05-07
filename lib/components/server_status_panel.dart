@@ -1,30 +1,16 @@
 import 'package:flutter/material.dart';
-
-/// MCPサーバーの接続状態を管理するクラス
-class McpServerStatus {
-  final String name;
-  final String url;
-  final Map<String, String> headers;
-  bool isConnected;
-  String? error;
-
-  McpServerStatus({
-    required this.name,
-    required this.url,
-    required this.headers,
-    this.isConnected = false,
-    this.error,
-  });
-}
+import 'package:mcp_notion_client/models/mcp_server_status.dart';
 
 class ServerStatusPanel extends StatefulWidget {
   final List<McpServerStatus> serverStatuses;
   final VoidCallback onRefresh;
+  final Function(String) onDelete;
 
   const ServerStatusPanel({
     super.key,
     required this.serverStatuses,
     required this.onRefresh,
+    required this.onDelete,
   });
 
   @override
@@ -48,10 +34,7 @@ class _ServerStatusPanelState extends State<ServerStatusPanel> {
             children: [
               const Text(
                 'MCPサーバー状態',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
               const SizedBox(width: 8),
               Text(
@@ -97,9 +80,7 @@ class _ServerStatusPanelState extends State<ServerStatusPanel> {
                         children: [
                           Text(
                             status.name,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w500,
-                            ),
+                            style: const TextStyle(fontWeight: FontWeight.w500),
                           ),
                           if (status.error != null)
                             Text(
@@ -112,6 +93,13 @@ class _ServerStatusPanelState extends State<ServerStatusPanel> {
                         ],
                       ),
                     ),
+                    IconButton(
+                      icon: const Icon(Icons.remove),
+                      onPressed:
+                          () => _showDeleteConfirmation(context, status.name),
+                      tooltip: 'サーバーを削除',
+                      iconSize: 20,
+                    ),
                   ],
                 ),
               ),
@@ -121,4 +109,32 @@ class _ServerStatusPanelState extends State<ServerStatusPanel> {
       ),
     );
   }
-} 
+
+  Future<void> _showDeleteConfirmation(
+    BuildContext context,
+    String serverName,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('サーバーの削除'),
+            content: Text('$serverName を削除してもよろしいですか？'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('キャンセル'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('削除'),
+              ),
+            ],
+          ),
+    );
+
+    if (confirmed == true) {
+      widget.onDelete(serverName);
+    }
+  }
+}

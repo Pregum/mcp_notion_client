@@ -1,10 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:mcp_client/mcp_client.dart';
-import 'server_status_panel.dart';
+import '../models/mcp_server_status.dart';
 
 class McpClientManager {
   final List<McpClientInfo> _clients = [];
   final List<McpServerStatus> _serverStatuses = [];
+
+  McpClientManager() {
+    _initializeDefaultServers();
+  }
+
+  void _initializeDefaultServers() {
+    _serverStatuses.addAll([
+      McpServerStatus(
+        name: 'Notion MCP',
+        url: 'http://${const String.fromEnvironment('SERVER_IP')}:8000/sse',
+        headers: {},
+      ),
+      McpServerStatus(
+        name: 'Spotify MCP',
+        url: 'http://${const String.fromEnvironment('SERVER_IP')}:8001/sse',
+        headers: {},
+      ),
+    ]);
+  }
 
   List<McpServerStatus> get serverStatuses => List.unmodifiable(_serverStatuses);
 
@@ -64,7 +83,7 @@ class McpClientManager {
   }
 
   Future<void> removeServer(String name) async {
-    final index = _serverStatuses.indexWhere((s) => s.name == name);
+    final index = _clients.indexWhere((s) => s.name == name);
     if (index == -1) {
       throw Exception('Server with name "$name" not found');
     }
