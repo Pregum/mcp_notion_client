@@ -29,19 +29,34 @@ Future<Client> setupMcpClient({required GenerativeModel geminiModel}) async {
     capabilities: ClientCapabilities(sampling: true),
   );
 
-  final transport = await McpClient.createSseTransport(
-    serverUrl: 'http://${const String.fromEnvironment('SERVER_IP')}:8000/sse',
-    headers: {
-      'Authorization':
-          'Bearer ${const String.fromEnvironment('NOTION_API_KEY')}',
-      'Notion-Version': '2022-06-28',
-    },
-  );
-  await mcpClient.connect(transport);
+  try {
+    final transport = await McpClient.createSseTransport(
+      serverUrl: 'http://${const String.fromEnvironment('SERVER_IP')}:8000/sse',
+      headers: {
+        'Authorization':
+            'Bearer ${const String.fromEnvironment('NOTION_API_KEY')}',
+        'Notion-Version': '2022-06-28',
+      },
+    );
 
-  // ブリッジの初期化
-  bridge = GeminiMcpBridge(mcp: mcpClient, model: geminiModel);
-  return mcpClient;
+    // 接続を試みる
+    await mcpClient.connect(transport).timeout(
+      const Duration(seconds: 10),
+      onTimeout: () {
+        throw McpError('Connection timeout');
+      },
+    );
+
+    // ブリッジの初期化
+    bridge = GeminiMcpBridge(mcp: mcpClient, model: geminiModel);
+    return mcpClient;
+  } catch (e) {
+    debugPrint('MCP Client setup error: $e');
+    if (e == 202) {
+      return mcpClient;
+    }
+    rethrow;
+  }
 }
 
 class MyApp extends StatelessWidget {
