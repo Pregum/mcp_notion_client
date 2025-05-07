@@ -1,25 +1,45 @@
-import 'package:flutter/material.dart';
-import 'package:mcp_client/mcp_client.dart' as mcp_client;
-import 'package:google_generative_ai/google_generative_ai.dart' as gemini;
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
+import 'package:google_generative_ai/google_generative_ai.dart' as gemini;
+import 'package:mcp_client/mcp_client.dart' as mcp_client;
+import 'mcp_client_manager.dart';
 
 class GeminiMcpBridge {
-  final mcp_client.Client mcp;
+  final McpClientManager _mcpManager;
   final gemini.GenerativeModel model;
   final List<gemini.Content> _chatHistory = [];
 
-  GeminiMcpBridge({required this.mcp, required this.model});
+  GeminiMcpBridge({
+    required McpClientManager mcpManager,
+    required this.model,
+  }) : _mcpManager = mcpManager;
 
   /// ユーザー入力を渡して最終テキストを返す
   Future<String> chat(String userPrompt) async {
     try {
-      // 1) MCP のツール定義を Gemini 用に変換
-      final geminiTools = _toGeminiTools(await mcp.listTools());
+      // 接続されているMCPクライアントがない場合はエラー
+      if (!_mcpManager.isAnyServerConnected()) {
+        throw Exception('No connected MCP servers available');
+      }
+
+      // 1) 接続されている全てのMCPクライアントからツール定義を取得
+      final allTools = <mcp_client.Tool>[];
+      for (final clientInfo in _mcpManager.connectedClients) {
+        try {
+          final tools = await clientInfo.client.listTools();
+          allTools.addAll(tools);
+        } catch (e) {
+          debugPrint('Failed to get tools from ${clientInfo.name}: $e');
+        }
+      }
+
+      // 2) MCP のツール定義を Gemini 用に変換
+      final geminiTools = _toGeminiTools(allTools);
       debugPrint(
         'Gemini Tools: ${geminiTools.map((e) => e.functionDeclarations?.firstOrNull?.name)}',
       );
 
-      // 2) LLM へ投げる（ユーザー発話）
+      // 3) LLM へ投げる（ユーザー発話）
       final userContent = gemini.Content.text(userPrompt);
       _chatHistory.add(userContent);
 
@@ -77,7 +97,7 @@ class GeminiMcpBridge {
       }
       debugPrint('===========================');
 
-      // 3) 関数呼び出しがあるか確認
+      // 4) 関数呼び出しがあるか確認
       final call =
           first.functionCalls.isNotEmpty ? first.functionCalls.first : null;
       if (call == null) {
@@ -86,8 +106,26 @@ class GeminiMcpBridge {
         return response;
       }
 
-      // 4) MCP ツールを実行
-      final toolResult = await mcp.callTool(call.name, call.args);
+      // 5) 適切なMCPクライアントを探してツールを実行
+      mcp_client.CallToolResult? toolResult;
+      String? errorMessage;
+
+      for (final clientInfo in _mcpManager.connectedClients) {
+        try {
+          final tools = await clientInfo.client.listTools();
+          if (tools.any((tool) => tool.name == call.name)) {
+            toolResult = await clientInfo.client.callTool(call.name, call.args);
+            break;
+          }
+        } catch (e) {
+          errorMessage = 'Failed to execute tool on ${clientInfo.name}: $e';
+          debugPrint(errorMessage);
+        }
+      }
+
+      if (toolResult == null) {
+        throw Exception(errorMessage ?? 'Tool not found in any connected MCP server');
+      }
 
       // デバッグ用のログ出力
       debugPrint('Tool Result Content: ${toolResult.content}');
@@ -126,7 +164,7 @@ class GeminiMcpBridge {
         }
       }
 
-      // 5) 実行結果を LLM に返し、要約を生成
+      // 6) 実行結果を LLM に返し、要約を生成
       final followUp = await model.generateContent([
         ..._chatHistory,
         gemini.Content.text('以下の実行結果を日本語で分かりやすく要約してください：'),

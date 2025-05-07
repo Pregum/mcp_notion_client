@@ -49,11 +49,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final geminiModel = await prepareGemini();
     _mcpManager = McpClientManager();
     _bridge = GeminiMcpBridge(
-      mcp: McpClient.createClient(
-        name: 'gemini-mcp-client',
-        version: '1.0.0',
-        capabilities: ClientCapabilities(sampling: true),
-      ),
+      mcpManager: _mcpManager,
       model: geminiModel,
     );
     _bridge.clearHistory();
