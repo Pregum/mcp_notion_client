@@ -8,7 +8,7 @@ class McpClientManager {
 
   List<McpServerStatus> get serverStatuses => List.unmodifiable(_serverStatuses);
 
-  Future<void> addServer({
+  Future<void> addServer(McpServerStatus serverStatus, {
     required String name,
     required String url,
     required Map<String, String> headers,
@@ -21,6 +21,7 @@ class McpClientManager {
     final status = McpServerStatus(
       name: name,
       url: url,
+      headers: headers,
     );
 
     try {
@@ -69,7 +70,7 @@ class McpClientManager {
     }
 
     final clientInfo = _clients.firstWhere((c) => c.name == name);
-    await clientInfo.client.disconnect();
+    clientInfo.client.disconnect();
     _clients.remove(clientInfo);
     _serverStatuses.removeAt(index);
   }

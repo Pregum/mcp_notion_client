@@ -25,10 +25,12 @@ class _ChatScreenState extends State<ChatScreen> {
     McpServerStatus(
       name: 'Notion MCP',
       url: 'http://${const String.fromEnvironment('SERVER_IP')}:8000/sse',
+      headers: {},
     ),
     McpServerStatus(
       name: 'Spotify MCP',
       url: 'http://${const String.fromEnvironment('SERVER_IP')}:8001/sse',
+      headers: {},
     ),
   ];
 
@@ -49,10 +51,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _initializeMcpClient() async {
     final geminiModel = await prepareGemini();
     _mcpManager = McpClientManager();
-    _bridge = GeminiMcpBridge(
-      mcpManager: _mcpManager,
-      model: geminiModel,
-    );
+    _bridge = GeminiMcpBridge(mcpManager: _mcpManager, model: geminiModel);
     _bridge.clearHistory();
 
     setState(() {
@@ -147,7 +146,12 @@ class _ChatScreenState extends State<ChatScreen> {
         _serverStatuses.add(serverStatus);
       });
 
-      await _mcpManager.addServer(serverStatus);
+      await _mcpManager.addServer(
+        serverStatus,
+        name: result['name'],
+        url: result['url'],
+        headers: result['headers'],
+      );
     }
   }
 
