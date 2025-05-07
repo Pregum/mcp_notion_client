@@ -17,13 +17,13 @@ class _AddServerDialogState extends State<AddServerDialog> {
   final Map<String, Map<String, String>> _serverTemplates = {
     'Notion': {
       'name': 'Notion MCP',
-      'url': 'http://localhost:8000/sse',
+      'url': 'http://192.168.11.35:8000/sse',
       'authHeader': 'Authorization',
       'authPrefix': 'Bearer ',
     },
     'Spotify': {
       'name': 'Spotify MCP',
-      'url': 'http://localhost:8001/sse',
+      'url': 'http://192.168.11.35:8001/sse',
       'authHeader': 'Authorization',
       'authPrefix': 'Bearer ',
     },
@@ -97,6 +97,7 @@ class _AddServerDialogState extends State<AddServerDialog> {
                 controller: _urlController,
                 decoration: const InputDecoration(
                   labelText: 'サーバーURL',
+                  hintText: '例: http://192.168.11.35:8000/sse',
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -105,6 +106,15 @@ class _AddServerDialogState extends State<AddServerDialog> {
                   final uri = Uri.tryParse(value);
                   if (uri == null || !uri.hasAbsolutePath) {
                     return '有効なURLを入力してください';
+                  }
+                  if (!uri.scheme.startsWith('http')) {
+                    return 'httpまたはhttpsで始まるURLを入力してください';
+                  }
+                  if (uri.host.isEmpty) {
+                    return 'ホスト名（IPアドレス）を入力してください';
+                  }
+                  if (uri.port == 0) {
+                    return 'ポート番号を指定してください';
                   }
                   return null;
                 },
