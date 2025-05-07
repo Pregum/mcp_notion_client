@@ -17,13 +17,13 @@ class _AddServerDialogState extends State<AddServerDialog> {
   final Map<String, Map<String, String>> _serverTemplates = {
     'Notion': {
       'name': 'Notion MCP',
-      'url': 'http://localhost:8000/sse',
+      'url': 'http://192.168.11.35:8000/sse',
       'authHeader': 'Authorization',
       'authPrefix': 'Bearer ',
     },
     'Spotify': {
       'name': 'Spotify MCP',
-      'url': 'http://localhost:8001/sse',
+      'url': 'http://192.168.11.35:8001/sse',
       'authHeader': 'Authorization',
       'authPrefix': 'Bearer ',
     },
@@ -97,14 +97,24 @@ class _AddServerDialogState extends State<AddServerDialog> {
                 controller: _urlController,
                 decoration: const InputDecoration(
                   labelText: 'サーバーURL',
+                  hintText: '例: http://192.168.11.35:8000/sse',
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'サーバーURLを入力してください';
                   }
                   final uri = Uri.tryParse(value);
-                  if (uri == null || !uri.hasAbsolutePath) {
+                  if (uri == null) {
                     return '有効なURLを入力してください';
+                  }
+                  if (!uri.scheme.startsWith('http')) {
+                    return 'httpまたはhttpsで始まるURLを入力してください';
+                  }
+                  if (uri.host.isEmpty) {
+                    return 'ホスト名（IPアドレス）を入力してください';
+                  }
+                  if (uri.port == 0) {
+                    return 'ポート番号を指定してください';
                   }
                   return null;
                 },
@@ -113,14 +123,8 @@ class _AddServerDialogState extends State<AddServerDialog> {
               TextFormField(
                 controller: _authTokenController,
                 decoration: const InputDecoration(
-                  labelText: '認証トークン',
+                  labelText: '認証トークン（任意）',
                 ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return '認証トークンを入力してください';
-                  }
-                  return null;
-                },
               ),
             ],
           ),
@@ -135,13 +139,16 @@ class _AddServerDialogState extends State<AddServerDialog> {
           onPressed: () {
             if (_formKey.currentState!.validate()) {
               final template = _serverTemplates[_selectedServerType]!;
+              final headers = _authTokenController.text.isNotEmpty
+                  ? {
+                      template['authHeader']!:
+                          '${template['authPrefix']!}${_authTokenController.text}',
+                    }
+                  : {};
               Navigator.of(context).pop({
                 'name': _nameController.text,
                 'url': _urlController.text,
-                'headers': {
-                  template['authHeader']!:
-                      '${template['authPrefix']!}${_authTokenController.text}',
-                },
+                'headers': headers,
               });
             }
           },
