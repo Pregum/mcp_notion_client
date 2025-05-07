@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:mcp_client/mcp_client.dart';
 import 'gemini_mcp_bridge.dart';
+import 'chat_message.dart';
 
 /// MCPサーバーの接続状態を管理するクラス
 class McpServerStatus {
@@ -30,7 +31,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final List<ChatMessage> _messages = [];
   bool _isLoading = false;
   final ScrollController _scrollController = ScrollController();
-  late GeminiMcpBridge bridge;
+  late final GeminiMcpBridge bridge;
   final List<McpServerStatus> _serverStatuses = [
     McpServerStatus(
       name: 'Notion MCP',
@@ -335,45 +336,5 @@ class _ChatScreenState extends State<ChatScreen> {
     _textController.dispose();
     _scrollController.dispose();
     super.dispose();
-  }
-}
-
-class ChatMessage extends StatelessWidget {
-  final String text;
-  final bool isUser;
-
-  const ChatMessage({super.key, required this.text, required this.isUser});
-
-  @override
-  Widget build(BuildContext context) {
-    return SelectionArea(
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 10.0),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              margin: const EdgeInsets.only(right: 16.0),
-              child: CircleAvatar(child: Text(isUser ? 'U' : 'A')),
-            ),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    isUser ? 'ユーザー' : 'アシスタント',
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
-                  Container(
-                    margin: const EdgeInsets.only(top: 5.0),
-                    child: Text(text),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }
