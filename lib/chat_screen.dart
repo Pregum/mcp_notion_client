@@ -4,6 +4,7 @@ import 'package:mcp_client/mcp_client.dart';
 import 'gemini_mcp_bridge.dart';
 import 'chat_message.dart';
 import 'server_status_panel.dart';
+import 'mcp_client_manager.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -17,7 +18,8 @@ class _ChatScreenState extends State<ChatScreen> {
   final List<ChatMessage> _messages = [];
   bool _isLoading = false;
   final ScrollController _scrollController = ScrollController();
-  late GeminiMcpBridge bridge;
+  late McpClientManager _mcpManager;
+  late GeminiMcpBridge _bridge;
   final List<McpServerStatus> _serverStatuses = [
     McpServerStatus(
       name: 'Notion MCP',
@@ -32,12 +34,10 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
-    // MCPクライアントの初期化 + Geminiモデルの用意 + MCPサーバーとの接続
     _initializeMcpClient();
   }
 
   Future<GenerativeModel> prepareGemini() async {
-    // Gemini Pro は Function Calling がデフォルト有効。
     final geminiModel = GenerativeModel(
       model: 'models/gemini-2.0-flash',
       apiKey: const String.fromEnvironment('GEMINI_API_KEY'),
@@ -45,66 +45,27 @@ class _ChatScreenState extends State<ChatScreen> {
     return geminiModel;
   }
 
-  Future<GeminiMcpBridge> setupMcpClient({
-    required GenerativeModel geminiModel,
-  }) async {
-    final mcpClient = McpClient.createClient(
-      name: 'gemini-mcp-client',
-      version: '1.0.0',
-      capabilities: ClientCapabilities(sampling: true),
-    );
-
-    // ブリッジの初期化
-    final bridge = GeminiMcpBridge(mcp: mcpClient, model: geminiModel);
-    return bridge;
-  }
-
   Future<void> _initializeMcpClient() async {
     final geminiModel = await prepareGemini();
-    bridge = await setupMcpClient(geminiModel: geminiModel);
-    bridge.clearHistory();
+    _mcpManager = McpClientManager();
+    _bridge = GeminiMcpBridge(
+      mcp: McpClient.createClient(
+        name: 'gemini-mcp-client',
+        version: '1.0.0',
+        capabilities: ClientCapabilities(sampling: true),
+      ),
+      model: geminiModel,
+    );
+    _bridge.clearHistory();
+
     setState(() {
       _messages.clear();
     });
-    try {
-      // Notion用のトランスポート
-      final notionTransport = await McpClient.createSseTransport(
-        serverUrl:
-            'http://${const String.fromEnvironment('SERVER_IP')}:8000/sse',
-        headers: {
-          'Authorization':
-              'Bearer ${const String.fromEnvironment('NOTION_API_KEY')}',
-          'Notion-Version': '2022-06-28',
-        },
-      );
 
-      try {
-        await bridge.mcp
-            .connect(notionTransport)
-            .timeout(
-              const Duration(seconds: 10),
-              onTimeout: () {
-                throw McpError('Notion connection timeout');
-              },
-            );
-        debugPrint('Notion MCP connected successfully');
-        setState(() {
-          _serverStatuses[0].isConnected = true;
-          _serverStatuses[0].error = null;
-        });
-      } catch (e) {
-        debugPrint('Notion MCP connection failed: $e');
-        setState(() {
-          _serverStatuses[0].isConnected = false;
-          _serverStatuses[0].error = e.toString();
-        });
-      }
-    } catch (e) {
-      debugPrint('MCP Client setup error: $e');
-      setState(() {
-        _serverStatuses[0].isConnected = false;
-        _serverStatuses[0].error = e.toString();
-      });
+    // 各サーバーに接続を試みる
+    for (final status in _serverStatuses) {
+      await _mcpManager.connectToServer(status);
+      setState(() {}); // UIを更新
     }
   }
 
@@ -120,10 +81,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _textController.clear();
 
     try {
-      // サーバーの接続状態を確認
-      final availableServers =
-          _serverStatuses.where((s) => s.isConnected).length;
-      if (availableServers == 0) {
+      if (!_mcpManager.isAnyServerConnected()) {
         setState(() {
           _messages.add(
             ChatMessage(
@@ -138,7 +96,7 @@ class _ChatScreenState extends State<ChatScreen> {
         return;
       }
 
-      final response = await bridge.chat(text);
+      final response = await _bridge.chat(text);
       setState(() {
         _messages.add(ChatMessage(text: response, isUser: false));
         _isLoading = false;
