@@ -5,6 +5,7 @@ import 'gemini_mcp_bridge.dart';
 import 'chat_message.dart';
 import 'server_status_panel.dart';
 import 'mcp_client_manager.dart';
+import 'add_server_dialog.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -127,10 +128,42 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
+  Future<void> _addServer() async {
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => const AddServerDialog(),
+    );
+
+    if (result != null) {
+      final serverStatus = McpServerStatus(
+        name: result['name'],
+        url: result['url'],
+        headers: result['headers'],
+        isConnected: false,
+        error: null,
+      );
+
+      setState(() {
+        _serverStatuses.add(serverStatus);
+      });
+
+      await _mcpManager.addServer(serverStatus);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('MCP Demo')),
+      appBar: AppBar(
+        title: const Text('MCP Chat'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.add),
+            onPressed: _addServer,
+            tooltip: 'サーバーを追加',
+          ),
+        ],
+      ),
       body: SafeArea(
         child: GestureDetector(
           onTap: () {
