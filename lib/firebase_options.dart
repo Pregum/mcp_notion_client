@@ -43,16 +43,16 @@ class DefaultFirebaseOptions {
     }
   }
 
-  static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyBJn6H-O2S9ci672PTiAagdAKLDu_uVWGM',
+  static FirebaseOptions get android => FirebaseOptions(
+    apiKey: const String.fromEnvironment('FIREBASE_API_KEY_ANDROID'),
     appId: '1:98948773919:android:f8f94ee7c7db6d1b6a3d2a',
     messagingSenderId: '98948773919',
     projectId: 'chat-hands-on',
     storageBucket: 'chat-hands-on.firebasestorage.app',
   );
 
-  static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyDebV3FIBSFFRH4owKnb0u4Fpak5AJaE-4',
+  static FirebaseOptions get ios => FirebaseOptions(
+    apiKey: const String.fromEnvironment('FIREBASE_API_KEY_IOS'),
     appId: '1:98948773919:ios:c9bb3f1d569266bf6a3d2a',
     messagingSenderId: '98948773919',
     projectId: 'chat-hands-on',
@@ -60,8 +60,8 @@ class DefaultFirebaseOptions {
     iosBundleId: 'com.example.mcpNotionClient',
   );
 
-  static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyDummyKeyForTesting',
+  static FirebaseOptions get macos => FirebaseOptions(
+    apiKey: const String.fromEnvironment('FIREBASE_API_KEY_MACOS'),
     appId: '1:1234567890:macos:dummy',
     messagingSenderId: '1234567890',
     projectId: 'mcp-notion-client',
@@ -69,8 +69,8 @@ class DefaultFirebaseOptions {
     iosBundleId: 'com.example.mcpNotionClient',
   );
 
-  static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyA_h-RU9SvPtYicvXQR-qIn2RtPvHYRRiY',
+  static FirebaseOptions get web => FirebaseOptions(
+    apiKey: const String.fromEnvironment('FIREBASE_API_KEY_WEB'),
     appId: '1:98948773919:web:1eaf0ef7f75357216a3d2a',
     messagingSenderId: '98948773919',
     projectId: 'chat-hands-on',
