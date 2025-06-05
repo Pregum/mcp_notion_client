@@ -133,83 +133,116 @@ class GeminiMcpBridge {
       _extractThinkingFromResponse(first);
       
       // 4) 関数呼び出しがあるか確認
-      final call =
-          first.functionCalls.isNotEmpty ? first.functionCalls.first : null;
-      if (call == null) {
+      final functionCalls = first.functionCalls.toList();
+      if (functionCalls.isEmpty) {
         _notifyThinking(ThinkingStep.completed, '回答を生成しました');
         final response = first.text ?? '';
         _chatHistory.add(gemini.Content.text(response));
         return response;
       }
 
-      // 5) 適切なMCPクライアントを探してツールを実行
-      _notifyThinking(ThinkingStep.executing, '${call.name}ツールを実行しています...');
-      mcp_client.CallToolResult? toolResult;
-      String? errorMessage;
+      // 5) 複数のツール実行を順次処理
+      final toolResults = <gemini.FunctionCall>[];
+      final toolResponses = <Map<String, dynamic>>[];
+      
+      for (final call in functionCalls) {
+        _notifyThinking(ThinkingStep.executing, '${call.name}ツールを実行しています...');
+        mcp_client.CallToolResult? toolResult;
+        String? errorMessage;
 
-      for (final clientInfo in _mcpManager.connectedClients) {
-        try {
-          final tools = await clientInfo.client.listTools();
-          if (tools.any((tool) => tool.name == call.name)) {
-            toolResult = await clientInfo.client.callTool(call.name, call.args);
-            break;
-          }
-        } catch (e) {
-          errorMessage = 'Failed to execute tool on ${clientInfo.name}: $e';
-          debugPrint(errorMessage);
-        }
-      }
-
-      if (toolResult == null) {
-        throw Exception(errorMessage ?? 'Tool not found in any connected MCP server');
-      }
-
-      // デバッグ用のログ出力
-      debugPrint('Tool Result Content: ${toolResult.content}');
-      final resultJson = toolResult.content.map((e) => e.toJson()).toList();
-      debugPrint('Result JSON: $resultJson');
-
-      // エラーチェック
-      if (resultJson.isNotEmpty && resultJson[0]['text'] != null) {
-        final errorText = resultJson[0]['text'];
-        if (errorText is String) {
+        // 適切なMCPクライアントを探してツールを実行
+        for (final clientInfo in _mcpManager.connectedClients) {
           try {
-            final errorJson = json.decode(errorText);
-            debugPrint('Error JSON - service: ${errorJson['service']}');
-            // サービスごとのエラーハンドリング
-            switch (errorJson['service']) {
-              case 'notion':
-                if (errorJson['code'] == 'unauthorized') {
-                  return 'NotionのAPIトークンが無効です。有効なAPIトークンを設定してください。';
-                }
-                break;
-
-              case 'spotify':
-                if (errorJson['code'] == 'unauthorized') {
-                  return 'Spotifyのアクセストークンが無効です。再認証が必要です。';
-                } else if (errorJson['code'] == 'rate_limit') {
-                  return 'Spotifyのレート制限に達しました。しばらく待ってから再試行してください。';
-                }
-                break;
-
-              default:
-                return 'エラーが発生しました: ${errorJson['message']}';
+            final tools = await clientInfo.client.listTools();
+            if (tools.any((tool) => tool.name == call.name)) {
+              toolResult = await clientInfo.client.callTool(call.name, call.args);
+              break;
             }
           } catch (e) {
-            // JSON解析エラーは無視
+            errorMessage = 'Failed to execute tool on ${clientInfo.name}: $e';
+            debugPrint(errorMessage);
           }
         }
+
+        if (toolResult == null) {
+          debugPrint('Tool ${call.name} not found in any connected MCP server: $errorMessage');
+          // ツールが見つからなくても続行
+          toolResponses.add({
+            'result': 'ツール ${call.name} が見つかりませんでした: ${errorMessage ?? 'Unknown error'}'
+          });
+          continue;
+        }
+
+        // デバッグ用のログ出力
+        debugPrint('Tool ${call.name} Result Content: ${toolResult.content}');
+        final resultJson = toolResult.content.map((e) => e.toJson()).toList();
+        debugPrint('Result JSON: $resultJson');
+
+        // エラーチェック
+        if (resultJson.isNotEmpty && resultJson[0]['text'] != null) {
+          final errorText = resultJson[0]['text'];
+          if (errorText is String) {
+            try {
+              final errorJson = json.decode(errorText);
+              debugPrint('Error JSON - service: ${errorJson['service']}');
+              // サービスごとのエラーハンドリング
+              switch (errorJson['service']) {
+                case 'notion':
+                  if (errorJson['code'] == 'unauthorized') {
+                    toolResponses.add({
+                      'result': 'NotionのAPIトークンが無効です。有効なAPIトークンを設定してください。'
+                    });
+                    continue;
+                  }
+                  break;
+
+                case 'spotify':
+                  if (errorJson['code'] == 'unauthorized') {
+                    toolResponses.add({
+                      'result': 'Spotifyのアクセストークンが無効です。再認証が必要です。'
+                    });
+                    continue;
+                  } else if (errorJson['code'] == 'rate_limit') {
+                    toolResponses.add({
+                      'result': 'Spotifyのレート制限に達しました。しばらく待ってから再試行してください。'
+                    });
+                    continue;
+                  }
+                  break;
+
+                default:
+                  toolResponses.add({
+                    'result': 'エラーが発生しました: ${errorJson['message']}'
+                  });
+                  continue;
+              }
+            } catch (e) {
+              // JSON解析エラーは無視
+            }
+          }
+        }
+
+        toolResults.add(call);
+        toolResponses.add({'result': resultJson});
       }
 
       // 6) 実行結果を LLM に返し、要約を生成
       _notifyThinking(ThinkingStep.completed, '実行結果を整理して回答を生成しています...');
       
-      final followUp = await model.generateContent([
+      final followUpContent = [
         ..._chatHistory,
         gemini.Content.text('以下の実行結果を日本語で分かりやすく要約してください：'),
-        gemini.Content.model([call]),
-        gemini.Content.functionResponse(call.name, {'result': resultJson}),
-      ]);
+        gemini.Content.model(toolResults),
+      ];
+      
+      // 各ツールの実行結果を追加
+      for (int i = 0; i < toolResults.length; i++) {
+        followUpContent.add(
+          gemini.Content.functionResponse(toolResults[i].name, toolResponses[i])
+        );
+      }
+      
+      final followUp = await model.generateContent(followUpContent);
 
       final response = followUp.text ?? 'レスポンスを生成できませんでした。';
       _chatHistory.add(gemini.Content.text(response));

@@ -67,50 +67,72 @@ class FirebaseAiBridge {
       _extractThinkingFromResponse(first);
       
       // 4) 関数呼び出しがあるか確認
-      final call = first.functionCalls.isNotEmpty ? first.functionCalls.first : null;
-      if (call == null) {
+      final functionCalls = first.functionCalls.toList();
+      if (functionCalls.isEmpty) {
         _notifyThinking(ThinkingStep.completed, '回答を生成しました');
         final response = first.text ?? '';
         _chatHistory.add(Content.text(response));
         return response;
       }
 
-      // 5) 適切なMCPクライアントを探してツールを実行
-      _notifyThinking(ThinkingStep.executing, '${call.name}ツールを実行しています...');
-      mcp_client.CallToolResult? toolResult;
-      String? errorMessage;
+      // 5) 複数のツール実行を順次処理
+      final toolResults = <FunctionCall>[];
+      final toolResponses = <Map<String, dynamic>>[];
+      
+      for (final call in functionCalls) {
+        _notifyThinking(ThinkingStep.executing, '${call.name}ツールを実行しています...');
+        mcp_client.CallToolResult? toolResult;
+        String? errorMessage;
 
-      for (final clientInfo in _mcpManager.connectedClients) {
-        try {
-          final tools = await clientInfo.client.listTools();
-          if (tools.any((tool) => tool.name == call.name)) {
-            toolResult = await clientInfo.client.callTool(call.name, call.args);
-            break;
+        // 適切なMCPクライアントを探してツールを実行
+        for (final clientInfo in _mcpManager.connectedClients) {
+          try {
+            final tools = await clientInfo.client.listTools();
+            if (tools.any((tool) => tool.name == call.name)) {
+              toolResult = await clientInfo.client.callTool(call.name, call.args);
+              break;
+            }
+          } catch (e) {
+            errorMessage = 'Failed to execute tool on ${clientInfo.name}: $e';
+            debugPrint(errorMessage);
           }
-        } catch (e) {
-          errorMessage = 'Failed to execute tool on ${clientInfo.name}: $e';
-          debugPrint(errorMessage);
         }
-      }
 
-      if (toolResult == null) {
-        throw Exception(errorMessage ?? 'Tool not found in any connected MCP server');
-      }
+        if (toolResult == null) {
+          debugPrint('Tool ${call.name} not found in any connected MCP server: $errorMessage');
+          // ツールが見つからなくても続行
+          toolResponses.add({
+            'result': 'ツール ${call.name} が見つかりませんでした: ${errorMessage ?? 'Unknown error'}'
+          });
+          continue;
+        }
 
-      // デバッグ用のログ出力
-      debugPrint('Tool Result Content: ${toolResult.content}');
-      final resultJson = toolResult.content.map((e) => e.toJson()).toList();
-      debugPrint('Result JSON: $resultJson');
+        // デバッグ用のログ出力
+        debugPrint('Tool ${call.name} Result Content: ${toolResult.content}');
+        final resultJson = toolResult.content.map((e) => e.toJson()).toList();
+        debugPrint('Result JSON: $resultJson');
+
+        toolResults.add(call);
+        toolResponses.add({'result': resultJson});
+      }
 
       // 6) 実行結果を Firebase AI に返し、要約を生成
       _notifyThinking(ThinkingStep.completed, '実行結果を整理して回答を生成しています...');
       
-      final followUp = await model.generateContent([
+      final followUpContent = [
         ..._chatHistory,
         Content.text('以下の実行結果を日本語で分かりやすく要約してください：'),
-        Content.model([call]),
-        Content.functionResponse(call.name, {'result': resultJson}),
-      ]);
+        Content.model(toolResults),
+      ];
+      
+      // 各ツールの実行結果を追加
+      for (int i = 0; i < toolResults.length; i++) {
+        followUpContent.add(
+          Content.functionResponse(toolResults[i].name, toolResponses[i])
+        );
+      }
+      
+      final followUp = await model.generateContent(followUpContent);
 
       final response = followUp.text ?? 'レスポンスを生成できませんでした。';
       _chatHistory.add(Content.text(response));
@@ -129,16 +151,16 @@ class FirebaseAiBridge {
   /// MCP → Firebase AI ツール変換
   List<Tool> _toFirebaseTools(List<mcp_client.Tool> infos) =>
       infos.map((t) {
-        // JSON Schema → Schema クラス（Firebase AI版）
-        final schema = Schema.object(
-          properties: _convertToFirebaseSchema(t.inputSchema),
-        );
+        // JSON Schema → パラメータマップに変換（Firebase AI版）
+        final parameters = _convertToFirebaseSchema(t.inputSchema);
 
-        return Tool(
-          functionDeclarations: [
-            FunctionDeclaration(t.name, t.description, schema),
-          ],
-        );
+        return Tool.functionDeclarations([
+          FunctionDeclaration(
+            t.name, 
+            t.description,
+            parameters: parameters,
+          ),
+        ]);
       }).toList();
 
   /// NotionのスキーマをFirebase AIのスキーマに変換
