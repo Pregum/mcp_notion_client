@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "98948773919",
+    "project_id": "chat-hands-on",
+    "storage_bucket": "chat-hands-on.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:98948773919:android:f8f94ee7c7db6d1b6a3d2a",
+        "android_client_info": {
+          "package_name": "com.example.mcp_notion_client"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "${FIREBASE_API_KEY_ANDROID}"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
