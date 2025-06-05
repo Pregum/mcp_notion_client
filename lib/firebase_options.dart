@@ -17,10 +17,7 @@ import 'package:flutter/foundation.dart'
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
-      throw UnsupportedError(
-        'DefaultFirebaseOptions have not been configured for web - '
-        'you can reconfigure this by running the FlutterFire CLI again.',
-      );
+      return web;
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
@@ -47,19 +44,19 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyDummyKeyForTesting',
-    appId: '1:1234567890:android:dummy',
-    messagingSenderId: '1234567890',
-    projectId: 'mcp-notion-client',
-    storageBucket: 'mcp-notion-client.appspot.com',
+    apiKey: 'AIzaSyBJn6H-O2S9ci672PTiAagdAKLDu_uVWGM',
+    appId: '1:98948773919:android:f8f94ee7c7db6d1b6a3d2a',
+    messagingSenderId: '98948773919',
+    projectId: 'chat-hands-on',
+    storageBucket: 'chat-hands-on.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyDummyKeyForTesting',
-    appId: '1:1234567890:ios:dummy',
-    messagingSenderId: '1234567890',
-    projectId: 'mcp-notion-client',
-    storageBucket: 'mcp-notion-client.appspot.com',
+    apiKey: 'AIzaSyDebV3FIBSFFRH4owKnb0u4Fpak5AJaE-4',
+    appId: '1:98948773919:ios:c9bb3f1d569266bf6a3d2a',
+    messagingSenderId: '98948773919',
+    projectId: 'chat-hands-on',
+    storageBucket: 'chat-hands-on.firebasestorage.app',
     iosBundleId: 'com.example.mcpNotionClient',
   );
 
@@ -71,4 +68,14 @@ class DefaultFirebaseOptions {
     storageBucket: 'mcp-notion-client.appspot.com',
     iosBundleId: 'com.example.mcpNotionClient',
   );
+
+  static const FirebaseOptions web = FirebaseOptions(
+    apiKey: 'AIzaSyA_h-RU9SvPtYicvXQR-qIn2RtPvHYRRiY',
+    appId: '1:98948773919:web:1eaf0ef7f75357216a3d2a',
+    messagingSenderId: '98948773919',
+    projectId: 'chat-hands-on',
+    authDomain: 'chat-hands-on.firebaseapp.com',
+    storageBucket: 'chat-hands-on.firebasestorage.app',
+  );
+
 }
