@@ -58,7 +58,8 @@ class ChatMessage extends StatelessWidget {
           Flexible(
             child: Container(
               constraints: BoxConstraints(
-                maxWidth: MediaQuery.of(context).size.width * 0.75,
+                maxWidth: MediaQuery.of(context).size.width * 0.8,
+                minWidth: 100,
               ),
               padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
               decoration: BoxDecoration(
@@ -79,7 +80,7 @@ class ChatMessage extends StatelessWidget {
                   ),
                 ],
               ),
-              child: Text(
+              child: SelectableText(
                 text,
                 style: TextStyle(
                   color: isUser
@@ -88,6 +89,8 @@ class ChatMessage extends StatelessWidget {
                   fontSize: 15,
                   height: 1.4,
                 ),
+                textAlign: TextAlign.left,
+                textWidthBasis: TextWidthBasis.longestLine,
               ),
             ),
           ),
@@ -198,6 +201,8 @@ class ChatMessage extends StatelessWidget {
                                     fontSize: 13,
                                     fontStyle: isCurrentStep ? FontStyle.italic : FontStyle.normal,
                                   ),
+                                  overflow: TextOverflow.visible,
+                                  softWrap: true,
                                 ),
                               ),
                             ],

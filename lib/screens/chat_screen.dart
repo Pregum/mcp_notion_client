@@ -397,7 +397,7 @@ class _ChatScreenState extends State<ChatScreen> {
               Expanded(
                 child: ListView.builder(
                   controller: _scrollController,
-                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
                   itemCount: _messages.length,
                   itemBuilder: (context, index) {
                     return AnimatedContainer(
