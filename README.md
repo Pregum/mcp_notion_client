@@ -53,3 +53,45 @@ Notionのページ操作をする際にpage idが必要になることがある�
 こちらのページを参照して取得してください
 
 <https://booknotion.site/setting-pageid>
+
+## ファイル構成
+
+### メインファイル
+- `lib/main.dart` - アプリのエントリーポイント、MyAppウィジェットの定義
+
+### 画面（Screens）
+- `lib/screens/chat_screen.dart` - メインのチャット画面、MCP初期化とUI管理
+
+### サービス（Services）
+- `lib/services/gemini_mcp_bridge.dart` - GeminiとMCPサーバー間の橋渡し、思考プロセス機能
+- `lib/services/mcp_client_manager.dart` - 複数MCPサーバーの接続管理
+
+### モデル（Models）
+- `lib/models/chat_message.dart` - チャットメッセージとthinking表示のUIコンポーネント
+- `lib/models/mcp_server_status.dart` - MCPサーバーの状態管理
+
+### コンポーネント（Components）
+- `lib/components/server_status_panel.dart` - MCPサーバー状態表示パネル
+- `lib/components/add_server_dialog.dart` - 新しいMCPサーバー追加ダイアログ
+
+### 設定ファイル
+- `CLAUDE.md` - Claude Code用の開発ガイダンス
+- `pubspec.yaml` - Flutterプロジェクトの依存関係とメタデータ
+- `analysis_options.yaml` - Dartコード解析設定
+
+## 主要機能
+
+### 1. MCP接続管理
+- 複数のMCPサーバーへの同時接続
+- サーバーの動的追加・削除
+- 接続状態のリアルタイム表示
+
+### 2. AIチャット機能
+- Gemini APIを使用した自然言語処理
+- MCPツールの自動選択と実行
+- 会話履歴の管理
+
+### 3. 思考プロセス可視化
+- AIの思考プロセスをリアルタイム表示
+- 4段階の思考ステップ（分析・計画・実行・完了）
+- 進行状況のビジュアル表示
