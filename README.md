@@ -15,19 +15,52 @@ sse接続するサーバーは、ローカルPC上に立ててアプリはそこ
 - Google アカウント
 - Notion アカウント
 
-起動前に.envに以下の設定を行ってください
+### 環境変数の設定
 
-- GEMINI_API_KEY
-  - <https://aistudio.google.com/app/apikey> から api keyを取得して設定してください
-- NOTION_API_KEY
-  - [notionのインテグレーション](https://www.notion.so/profile/integrations) で取得したAPI Keyを設定してください
-- SERVER_IP
-  - ローカルPCのIPアドレス(ifconfigなどで取得したローカルIPアドレスを設定してください)
+起動前に以下の環境変数を設定してください：
+
+#### 必須環境変数
+- `GEMINI_API_KEY` - [Google AI Studio](https://aistudio.google.com/app/apikey) から取得
+- `NOTION_API_KEY` - [Notionインテグレーション](https://www.notion.so/profile/integrations) から取得
+- `SERVER_IP` - ローカルPCのIPアドレス（ifconfigなどで取得）
+
+#### Firebase関連環境変数
+- `FIREBASE_API_KEY_ANDROID` - Android用Firebase API Key
+- `FIREBASE_API_KEY_IOS` - iOS用Firebase API Key  
+- `FIREBASE_API_KEY_MACOS` - macOS用Firebase API Key
+- `FIREBASE_API_KEY_WEB` - Web用Firebase API Key
+
+#### オプション環境変数（デフォルト値あり）
+- `FIREBASE_PROJECT_NUMBER` - Firebase プロジェクト番号
+- `FIREBASE_PROJECT_ID` - Firebase プロジェクトID
+- `FIREBASE_STORAGE_BUCKET` - Firebase Storage バケット
+- `FIREBASE_ANDROID_APP_ID` - Android アプリID
+- `FIREBASE_IOS_APP_ID` - iOS アプリID
+- `ANDROID_PACKAGE_NAME` - Androidパッケージ名
+- `IOS_BUNDLE_ID` - iOS Bundle ID
 
 ```.env
 GEMINI_API_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 NOTION_API_KEY=ntn_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 SERVER_IP=xxx.xxx.xx.xx
+FIREBASE_API_KEY_ANDROID=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+FIREBASE_API_KEY_IOS=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+FIREBASE_API_KEY_MACOS=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+FIREBASE_API_KEY_WEB=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+### セットアップ手順
+
+1. 環境変数を設定
+2. Google Services設定ファイルを生成：
+```bash
+./scripts/setup_env.sh
+```
+
+または
+
+```bash
+dart run scripts/generate_google_services.dart
 ```
 
 ## demo
