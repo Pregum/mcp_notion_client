@@ -22,6 +22,15 @@ class _ChatScreenState extends State<ChatScreen> {
   final ScrollController _scrollController = ScrollController();
   late McpClientManager _mcpManager;
   late GeminiMcpBridge _bridge;
+  
+  // Thinking関連の状態
+  ChatMessage? _currentThinkingMessage;
+  final List<String> _thinkingSteps = [
+    'ユーザーの質問を分析中',
+    '実行計画を立案中', 
+    'ツールを実行中',
+    '回答を生成中'
+  ];
 
   @override
   void initState() {
@@ -45,9 +54,16 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       final geminiModel = await prepareGemini();
       _mcpManager = McpClientManager();
-      _bridge = GeminiMcpBridge(mcpManager: _mcpManager, model: geminiModel);
+      _bridge = GeminiMcpBridge(
+        mcpManager: _mcpManager, 
+        model: geminiModel,
+        onThinking: _handleThinking,
+      );
       _bridge.clearHistory();
       _messages.clear();
+      
+      // thinking状態をリセット
+      _clearThinking();
 
       // 各サーバーに接続を試みる
       for (final status in _mcpManager.serverStatuses) {
@@ -59,6 +75,39 @@ class _ChatScreenState extends State<ChatScreen> {
           _isInitializing = false;
         });
       }
+    }
+  }
+  
+  void _handleThinking(ThinkingStep step, String message) {
+    setState(() {
+      if (_currentThinkingMessage == null) {
+        // 初回のthinkingメッセージを作成
+        _currentThinkingMessage = ChatMessage.thinking(
+          currentStep: step,
+          thinkingSteps: _thinkingSteps,
+        );
+        _messages.add(_currentThinkingMessage!);
+      } else {
+        // 既存のthinkingメッセージを更新
+        final index = _messages.indexOf(_currentThinkingMessage!);
+        if (index != -1) {
+          _messages[index] = ChatMessage.thinking(
+            currentStep: step,
+            thinkingSteps: _thinkingSteps,
+          );
+          _currentThinkingMessage = _messages[index];
+        }
+      }
+    });
+    _scrollToBottom();
+  }
+  
+  void _clearThinking() {
+    if (_currentThinkingMessage != null) {
+      setState(() {
+        _messages.remove(_currentThinkingMessage!);
+        _currentThinkingMessage = null;
+      });
     }
   }
 
@@ -90,6 +139,10 @@ class _ChatScreenState extends State<ChatScreen> {
       // }
 
       final response = await _bridge.chat(text);
+      
+      // thinkingメッセージを削除して回答を追加
+      _clearThinking();
+      
       setState(() {
         _messages.add(ChatMessage(text: response, isUser: false));
         _isLoading = false;
@@ -97,6 +150,10 @@ class _ChatScreenState extends State<ChatScreen> {
       _scrollToBottom();
     } catch (e, stackTrace) {
       debugPrint('エラーが発生しました: $e, $stackTrace');
+      
+      // thinkingメッセージを削除
+      _clearThinking();
+      
       setState(() {
         _messages.add(
           ChatMessage(

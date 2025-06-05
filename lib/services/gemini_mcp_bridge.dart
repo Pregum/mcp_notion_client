@@ -3,26 +3,40 @@ import 'package:flutter/foundation.dart';
 import 'package:google_generative_ai/google_generative_ai.dart' as gemini;
 import 'package:mcp_client/mcp_client.dart' as mcp_client;
 import 'mcp_client_manager.dart';
+import '../models/chat_message.dart';
+
+typedef ThinkingCallback = void Function(ThinkingStep step, String message);
 
 class GeminiMcpBridge {
   final McpClientManager _mcpManager;
   final gemini.GenerativeModel model;
   final List<gemini.Content> _chatHistory = [];
+  ThinkingCallback? _thinkingCallback;
 
   GeminiMcpBridge({
     required McpClientManager mcpManager,
     required this.model,
-  }) : _mcpManager = mcpManager;
+    ThinkingCallback? onThinking,
+  }) : _mcpManager = mcpManager,
+       _thinkingCallback = onThinking;
+
+  void setThinkingCallback(ThinkingCallback? callback) {
+    _thinkingCallback = callback;
+  }
 
   /// ユーザー入力を渡して最終テキストを返す
   Future<String> chat(String userPrompt) async {
     try {
+      // Thinking step 1: ユーザー入力の理解
+      _notifyThinking(ThinkingStep.understanding, 'ユーザーの質問を分析しています...');
+      
       // // 接続されているMCPクライアントがない場合はエラー
       // if (!_mcpManager.isAnyServerConnected()) {
       //   throw Exception('No connected MCP servers available');
       // }
 
       // 1) 接続されている全てのMCPクライアントからツール定義を取得
+      _notifyThinking(ThinkingStep.planning, '利用可能なツールを確認しています...');
       final allTools = <mcp_client.Tool>[];
       for (final clientInfo in _mcpManager.connectedClients) {
         try {
@@ -38,6 +52,8 @@ class GeminiMcpBridge {
       debugPrint(
         'Gemini Tools: ${geminiTools.map((e) => e.functionDeclarations?.firstOrNull?.name)}',
       );
+      
+      _notifyThinking(ThinkingStep.planning, '実行計画を立てています...');
 
       // 3) LLM へ投げる（ユーザー発話）
       final userContent = gemini.Content.text(userPrompt);
@@ -101,12 +117,14 @@ class GeminiMcpBridge {
       final call =
           first.functionCalls.isNotEmpty ? first.functionCalls.first : null;
       if (call == null) {
+        _notifyThinking(ThinkingStep.completed, '回答を生成しました');
         final response = first.text ?? '';
         _chatHistory.add(gemini.Content.text(response));
         return response;
       }
 
       // 5) 適切なMCPクライアントを探してツールを実行
+      _notifyThinking(ThinkingStep.executing, '${call.name}ツールを実行しています...');
       mcp_client.CallToolResult? toolResult;
       String? errorMessage;
 
@@ -165,6 +183,8 @@ class GeminiMcpBridge {
       }
 
       // 6) 実行結果を LLM に返し、要約を生成
+      _notifyThinking(ThinkingStep.completed, '実行結果を整理して回答を生成しています...');
+      
       final followUp = await model.generateContent([
         ..._chatHistory,
         gemini.Content.text('以下の実行結果を日本語で分かりやすく要約してください：'),
@@ -273,5 +293,9 @@ class GeminiMcpBridge {
       default:
         return gemini.Schema.string();
     }
+  }
+  
+  void _notifyThinking(ThinkingStep step, String message) {
+    _thinkingCallback?.call(step, message);
   }
 }
