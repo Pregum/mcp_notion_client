@@ -9,7 +9,7 @@ typedef ThinkingCallback = void Function(ThinkingStep step, String message);
 
 class GeminiMcpBridge {
   final McpClientManager _mcpManager;
-  final gemini.GenerativeModel model;
+  gemini.GenerativeModel model;
   final List<gemini.Content> _chatHistory = [];
   ThinkingCallback? _thinkingCallback;
 
@@ -22,6 +22,12 @@ class GeminiMcpBridge {
 
   void setThinkingCallback(ThinkingCallback? callback) {
     _thinkingCallback = callback;
+  }
+  
+  void updateModel(gemini.GenerativeModel newModel) {
+    model = newModel;
+    // モデル変更時はチャット履歴をクリア
+    clearHistory();
   }
 
   /// ユーザー入力を渡して最終テキストを返す

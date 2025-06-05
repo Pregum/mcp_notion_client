@@ -6,6 +6,8 @@ import '../models/chat_message.dart';
 import '../components/server_status_panel.dart';
 import '../services/mcp_client_manager.dart';
 import '../components/add_server_dialog.dart';
+import '../models/gemini_model_config.dart';
+import '../components/model_selector_dialog.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -31,6 +33,9 @@ class _ChatScreenState extends State<ChatScreen> {
     'ツールを実行中',
     '回答を生成中'
   ];
+  
+  // モデル関連の状態
+  GeminiModelConfig _currentModel = GeminiModelConfig.defaultModel;
 
   @override
   void initState() {
@@ -38,9 +43,10 @@ class _ChatScreenState extends State<ChatScreen> {
     _initializeMcpClient();
   }
 
-  Future<GenerativeModel> prepareGemini() async {
+  Future<GenerativeModel> prepareGemini([GeminiModelConfig? modelConfig]) async {
+    final config = modelConfig ?? _currentModel;
     final geminiModel = GenerativeModel(
-      model: 'models/gemini-2.0-flash',
+      model: config.modelId,
       apiKey: const String.fromEnvironment('GEMINI_API_KEY'),
     );
     return geminiModel;
@@ -74,6 +80,34 @@ class _ChatScreenState extends State<ChatScreen> {
         setState(() {
           _isInitializing = false;
         });
+      }
+    }
+  }
+  
+  Future<void> _changeModel() async {
+    final selectedModel = await showDialog<GeminiModelConfig?>(
+      context: context,
+      builder: (context) => ModelSelectorDialog(
+        currentModel: _currentModel,
+      ),
+    );
+    
+    if (selectedModel != null && selectedModel != _currentModel) {
+      setState(() {
+        _currentModel = selectedModel;
+      });
+      
+      // 新しいモデルでブリッジを更新
+      final newGeminiModel = await prepareGemini(selectedModel);
+      _bridge.updateModel(newGeminiModel);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('モデルを${selectedModel.displayName}に変更しました'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
       }
     }
   }
@@ -247,6 +281,11 @@ class _ChatScreenState extends State<ChatScreen> {
         title: const Text('MCP Chat'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.settings_applications),
+            onPressed: _changeModel,
+            tooltip: 'AIモデルを変更',
+          ),
+          IconButton(
             icon: const Icon(Icons.add),
             onPressed: _addServer,
             tooltip: 'サーバーを追加',
@@ -264,6 +303,40 @@ class _ChatScreenState extends State<ChatScreen> {
                 serverStatuses: _mcpManager.serverStatuses,
                 onRefresh: _initializeMcpClient,
                 onDelete: _deleteServer,
+              ),
+              // 現在のモデル表示
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                child: Row(
+                  children: [
+                    const Icon(Icons.psychology, size: 16),
+                    const SizedBox(width: 8),
+                    Text(
+                      'AI Model: ${_currentModel.displayName}',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                    ),
+                    if (_currentModel.isExperimental) ...[                      
+                      const SizedBox(width: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.shade100,
+                          borderRadius: BorderRadius.circular(3),
+                          border: Border.all(color: Colors.orange.shade300, width: 0.5),
+                        ),
+                        child: Text(
+                          'BETA',
+                          style: TextStyle(
+                            fontSize: 8,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.orange.shade700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ),
               const Divider(),
               // 既存のチャットUI
