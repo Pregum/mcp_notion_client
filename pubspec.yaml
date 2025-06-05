@@ -37,8 +37,8 @@ dependencies:
   flutter_gemini: ^3.0.0-dev.1  # Gemini APIとの連携用
   # MCP クライアント
   mcp_client: ^0.1.7          # spec 2024-11-05 対応  [oai_citation:6‡GitHub](https://github.com/app-appplayer/mcp_client)
-  # Gemini SDK（0.4 系はまだ Function Calling に対応。将来は Firebase 統合版へ移行）
-  google_generative_ai: ^0.4.6  # 2024-Aug 最終リリース  [oai_citation:7‡GitHub](https://github.com/google-gemini/generative-ai-dart)
+  # Gemini SDK (最新版に更新、将来的にFirebase統合版への移行を検討)
+  google_generative_ai: ^0.4.7  # 最新版
   shared_preferences: ^2.2.0  # API keyの保存用
   http: ^1.1.0            # HTTPリクエスト用
   flutter_hooks: ^0.21.0

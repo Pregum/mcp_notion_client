@@ -15,6 +15,20 @@ class GeminiModelConfig {
 
   static const List<GeminiModelConfig> availableModels = [
     GeminiModelConfig(
+      modelId: 'models/gemini-2.0-flash-thinking-exp',
+      displayName: 'Gemini 2.0 Flash Thinking',
+      description: '思考プロセス表示対応の実験版モデル',
+      supportsFunctionCalling: true,
+      isExperimental: true,
+    ),
+    GeminiModelConfig(
+      modelId: 'models/gemini-2.0-flash-exp',
+      displayName: 'Gemini 2.0 Flash Experimental',
+      description: '最新機能テスト版、実験的な機能を含む',
+      supportsFunctionCalling: true,
+      isExperimental: true,
+    ),
+    GeminiModelConfig(
       modelId: 'models/gemini-2.0-flash',
       displayName: 'Gemini 2.0 Flash',
       description: '最新の高速モデル、マルチモーダル対応',
