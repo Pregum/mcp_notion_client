@@ -11,6 +11,7 @@ import '../services/mcp_client_manager.dart';
 import '../components/add_server_dialog.dart';
 import '../models/gemini_model_config.dart';
 import '../components/model_selector_dialog.dart';
+import '../components/tool_list_dialog.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -293,6 +294,15 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  Future<void> _showToolList() async {
+    await showDialog(
+      context: context,
+      builder: (context) => ToolListDialog(
+        mcpManager: _mcpManager,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isInitializing) {
@@ -340,6 +350,19 @@ class _ChatScreenState extends State<ChatScreen> {
           ],
         ),
         actions: [
+          Container(
+            margin: const EdgeInsets.only(right: 4),
+            child: IconButton.outlined(
+              icon: const Icon(Icons.build_rounded),
+              onPressed: _showToolList,
+              tooltip: 'ツール一覧を表示',
+              style: IconButton.styleFrom(
+                side: BorderSide(
+                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+                ),
+              ),
+            ),
+          ),
           Container(
             margin: const EdgeInsets.only(right: 4),
             child: IconButton.outlined(
