@@ -21,6 +21,21 @@ class GeminiModelConfig {
   });
 
   static const List<GeminiModelConfig> availableModels = [
+    // Gemini 2.5 モデル (thinking機能対応)
+    GeminiModelConfig(
+      modelId: 'gemini-2.5-pro-preview-06-05',
+      displayName: 'Gemini 2.5 Pro Preview 06-05',
+      description: '最新高性能モデル、thinking機能対応',
+      supportsFunctionCalling: true,
+      isExperimental: true,
+    ),
+    GeminiModelConfig(
+      modelId: 'models/gemini-2.5-flash-preview-05-20',
+      displayName: 'Gemini 2.5 Flash Preview 05-20',
+      description: '最新高速モデル、thinking機能対応',
+      supportsFunctionCalling: true,
+      isExperimental: true,
+    ),
     // Firebase AI モデル
     GeminiModelConfig(
       modelId: 'gemini-2.0-flash-thinking-exp',
@@ -77,21 +92,6 @@ class GeminiModelConfig {
       displayName: 'Gemini 1.0 Pro',
       description: '安定版モデル、実用性重視',
       supportsFunctionCalling: true,
-    ),
-    // Gemini 2.5 モデル (thinking機能対応)
-    GeminiModelConfig(
-      modelId: 'models/gemini-2.5-pro',
-      displayName: 'Gemini 2.5 Pro',
-      description: '最新高性能モデル、thinking機能対応',
-      supportsFunctionCalling: true,
-      isExperimental: true,
-    ),
-    GeminiModelConfig(
-      modelId: 'models/gemini-2.5-flash',
-      displayName: 'Gemini 2.5 Flash',
-      description: '最新高速モデル、thinking機能対応',
-      supportsFunctionCalling: true,
-      isExperimental: true,
     ),
   ];
 
