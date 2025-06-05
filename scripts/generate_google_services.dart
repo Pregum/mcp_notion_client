@@ -16,6 +16,11 @@ void generateAndroidGoogleServices() {
   final apiKey = Platform.environment['FIREBASE_API_KEY_ANDROID'] ?? '';
   final packageName = Platform.environment['ANDROID_PACKAGE_NAME'] ?? 'com.example.mcp_notion_client';
 
+  print('🔍 Android設定値:');
+  print('  API Key: ${apiKey.isNotEmpty ? '${apiKey.substring(0, 10)}...' : '(未設定)'}');
+  print('  Project ID: $projectId');
+  print('  App ID: $appId');
+
   if (apiKey.isEmpty) {
     print('警告: FIREBASE_API_KEY_ANDROID が設定されていません');
   }
@@ -56,8 +61,21 @@ void generateAndroidGoogleServices() {
   }
 
   final file = File('android/app/google-services.json');
-  file.writeAsStringSync(JsonEncoder.withIndent('  ').convert(googleServicesJson));
-  print('✅ android/app/google-services.json を生成しました');
+  final jsonContent = JsonEncoder.withIndent('  ').convert(googleServicesJson);
+  
+  print('📝 Androidファイル生成中...');
+  print('  パス: ${file.absolute.path}');
+  print('  内容サイズ: ${jsonContent.length} bytes');
+  
+  file.writeAsStringSync(jsonContent);
+  
+  // 生成確認
+  if (file.existsSync()) {
+    final fileSize = file.lengthSync();
+    print('✅ android/app/google-services.json を生成しました (${fileSize} bytes)');
+  } else {
+    print('❌ android/app/google-services.json の生成に失敗しました');
+  }
 }
 
 void generateIosGoogleServiceInfo() {
@@ -67,6 +85,11 @@ void generateIosGoogleServiceInfo() {
   final projectId = Platform.environment['FIREBASE_PROJECT_ID'] ?? 'chat-hands-on';
   final storageBucket = Platform.environment['FIREBASE_STORAGE_BUCKET'] ?? 'chat-hands-on.firebasestorage.app';
   final googleAppId = Platform.environment['FIREBASE_IOS_APP_ID'] ?? '1:98948773919:ios:c9bb3f1d569266bf6a3d2a';
+
+  print('🔍 iOS設定値:');
+  print('  API Key: ${apiKey.isNotEmpty ? '${apiKey.substring(0, 10)}...' : '(未設定)'}');
+  print('  Project ID: $projectId');
+  print('  Bundle ID: $bundleId');
 
   if (apiKey.isEmpty) {
     print('警告: FIREBASE_API_KEY_IOS が設定されていません');
@@ -109,6 +132,18 @@ void generateIosGoogleServiceInfo() {
   }
 
   final file = File('ios/Runner/GoogleService-Info.plist');
+  
+  print('📝 iOSファイル生成中...');
+  print('  パス: ${file.absolute.path}');
+  print('  内容サイズ: ${plistContent.length} bytes');
+  
   file.writeAsStringSync(plistContent);
-  print('✅ ios/Runner/GoogleService-Info.plist を生成しました');
+  
+  // 生成確認
+  if (file.existsSync()) {
+    final fileSize = file.lengthSync();
+    print('✅ ios/Runner/GoogleService-Info.plist を生成しました (${fileSize} bytes)');
+  } else {
+    print('❌ ios/Runner/GoogleService-Info.plist の生成に失敗しました');
+  }
 }
