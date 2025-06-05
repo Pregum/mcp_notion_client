@@ -1,3 +1,4 @@
+import 'package:firebase_ai/firebase_ai.dart';
 import 'package:flutter/material.dart';
 import 'package:google_generative_ai/google_generative_ai.dart' as google_ai;
 import 'package:firebase_ai/firebase_ai.dart' as firebase_ai;
@@ -24,15 +25,15 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _textController = TextEditingController();
   final List<ChatMessage> _messages = [];
   bool _isLoading = false;
-  bool _isInitializing = true;  // 初期化状態を管理するフラグを追加
+  bool _isInitializing = true; // 初期化状態を管理するフラグを追加
   final ScrollController _scrollController = ScrollController();
   late McpClientManager _mcpManager;
   late GeminiMcpBridge _bridge;
   FirebaseAiBridge? _firebaseBridge;
-  
+
   // Thinking関連の状態
   ChatMessage? _currentThinkingMessage;
-  
+
   // モデル関連の状態
   GeminiModelConfig _currentModel = GeminiModelConfig.defaultModel;
 
@@ -44,7 +45,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<dynamic> prepareModel([GeminiModelConfig? modelConfig]) async {
     final config = modelConfig ?? _currentModel;
-    
+
     if (config.isFirebaseAi) {
       // Firebase AI モデル
       try {
@@ -62,10 +63,11 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     } else {
       // Google Generative AI モデル
-      return google_ai.GenerativeModel(
+      final model = FirebaseAI.googleAI().generativeModel(
         model: config.modelId,
-        apiKey: const String.fromEnvironment('GEMINI_API_KEY'),
+        generationConfig: GenerationConfig(),
       );
+      return model;
     }
   }
 
@@ -75,16 +77,20 @@ class _ChatScreenState extends State<ChatScreen> {
     });
 
     try {
-      debugPrint('🚀 Initializing MCP client with model: ${_currentModel.displayName}');
+      debugPrint(
+        '🚀 Initializing MCP client with model: ${_currentModel.displayName}',
+      );
       debugPrint('🚀 Model details:');
       debugPrint('  - Model ID: ${_currentModel.modelId}');
       debugPrint('  - Provider: ${_currentModel.provider}');
       debugPrint('  - Is Firebase AI: ${_currentModel.isFirebaseAi}');
-      debugPrint('  - Is Google Generative AI: ${_currentModel.isGoogleGenerativeAi}');
-      
+      debugPrint(
+        '  - Is Google Generative AI: ${_currentModel.isGoogleGenerativeAi}',
+      );
+
       final model = await prepareModel();
       _mcpManager = McpClientManager();
-      
+
       // Firebase AI か Google Generative AI かでブリッジを選択
       if (_currentModel.isFirebaseAi && model is firebase_ai.GenerativeModel) {
         _firebaseBridge = FirebaseAiBridge(
@@ -96,16 +102,16 @@ class _ChatScreenState extends State<ChatScreen> {
         debugPrint('Using Firebase AI Bridge');
       } else {
         _bridge = GeminiMcpBridge(
-          mcpManager: _mcpManager, 
-          model: model as google_ai.GenerativeModel,
+          mcpManager: _mcpManager,
+          model: model,
           onThinking: _handleThinking,
         );
         _bridge.clearHistory();
         debugPrint('Using Google Generative AI Bridge');
       }
-      
+
       _messages.clear();
-      
+
       // thinking状態をリセット
       _clearThinking();
 
@@ -121,30 +127,32 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     }
   }
-  
+
   Future<void> _changeModel() async {
     final selectedModel = await showDialog<GeminiModelConfig?>(
       context: context,
-      builder: (context) => ModelSelectorDialog(
-        currentModel: _currentModel,
-      ),
+      builder: (context) => ModelSelectorDialog(currentModel: _currentModel),
     );
-    
+
     if (selectedModel != null && selectedModel != _currentModel) {
-      debugPrint('🔄 Model changed from ${_currentModel.displayName} to ${selectedModel.displayName}');
+      debugPrint(
+        '🔄 Model changed from ${_currentModel.displayName} to ${selectedModel.displayName}',
+      );
       debugPrint('🔄 New model details:');
       debugPrint('  - Model ID: ${selectedModel.modelId}');
       debugPrint('  - Provider: ${selectedModel.provider}');
       debugPrint('  - Is experimental: ${selectedModel.isExperimental}');
-      debugPrint('  - Supports thinking (expected): ${selectedModel.modelId.contains('2.5')}');
-      
+      debugPrint(
+        '  - Supports thinking (expected): ${selectedModel.modelId.contains('2.5')}',
+      );
+
       setState(() {
         _currentModel = selectedModel;
       });
-      
+
       // 新しいモデルでブリッジを更新
       await _initializeMcpClient();
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -155,7 +163,7 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     }
   }
-  
+
   void _handleThinking(ThinkingStep step, String message) {
     // 実際の思考情報がある場合のみ表示（疑似的な思考ステップは表示しない）
     if (step == ThinkingStep.planning && message.length > 50) {
@@ -183,7 +191,7 @@ class _ChatScreenState extends State<ChatScreen> {
       _scrollToBottom();
     }
   }
-  
+
   void _clearThinking() {
     if (_currentThinkingMessage != null) {
       setState(() {
@@ -221,45 +229,62 @@ class _ChatScreenState extends State<ChatScreen> {
       // }
 
       // 思考情報付きレスポンスを取得
-      debugPrint('💭 Getting thinking response for model: ${_currentModel.displayName}');
-      final thinkingResponse = _currentModel.isFirebaseAi && _firebaseBridge != null
-          ? null // Firebase AIは現在思考情報をサポートしていない
-          : await _bridge.chatWithThinking(text);
-      
+      debugPrint(
+        '💭 Getting thinking response for model: ${_currentModel.displayName}',
+      );
+      final thinkingResponse =
+          _currentModel.isFirebaseAi && _firebaseBridge != null
+              ? null // Firebase AIは現在思考情報をサポートしていない
+              : await _bridge.chatWithThinking(
+                text,
+                modelDisplayName: _currentModel.displayName,
+              );
+
       String responseText;
       String? thinkingContent;
-      
+
       if (thinkingResponse != null) {
         // Google Generative AI (思考情報対応)
         responseText = thinkingResponse.text;
-        thinkingContent = thinkingResponse.thoughts.isNotEmpty ? thinkingResponse.thoughts : null;
-        
+        thinkingContent =
+            thinkingResponse.thoughts.isNotEmpty
+                ? thinkingResponse.thoughts
+                : null;
+
         debugPrint('💭 Thinking response received:');
         debugPrint('  - Response text length: ${responseText.length}');
-        debugPrint('  - Thinking content length: ${thinkingResponse.thoughts.length}');
+        debugPrint(
+          '  - Thinking content length: ${thinkingResponse.thoughts.length}',
+        );
         debugPrint('  - Has thinking content: ${thinkingContent != null}');
-        
+
         if (thinkingContent != null) {
-          debugPrint('💭 Thinking preview: ${thinkingContent.substring(0, thinkingContent.length > 100 ? 100 : thinkingContent.length)}...');
+          debugPrint(
+            '💭 Thinking preview: ${thinkingContent.substring(0, thinkingContent.length > 100 ? 100 : thinkingContent.length)}...',
+          );
         }
       } else {
         // Firebase AI (通常の応答)
         responseText = await _firebaseBridge!.chat(text);
         thinkingContent = null;
-        debugPrint('💭 Firebase AI response (no thinking): ${responseText.length} chars');
+        debugPrint(
+          '💭 Firebase AI response (no thinking): ${responseText.length} chars',
+        );
       }
-      
+
       // thinkingメッセージを削除して回答を追加
       _clearThinking();
-      
+
       setState(() {
         if (thinkingContent != null && thinkingContent.isNotEmpty) {
           // 思考情報付きメッセージ
           debugPrint('💭 Adding message with thinking content');
-          _messages.add(ChatMessage.withThoughts(
-            text: responseText,
-            actualThoughts: thinkingContent,
-          ));
+          _messages.add(
+            ChatMessage.withThoughts(
+              text: responseText,
+              actualThoughts: thinkingContent,
+            ),
+          );
         } else {
           // 通常のメッセージ
           debugPrint('💭 Adding regular message (no thinking)');
@@ -270,10 +295,10 @@ class _ChatScreenState extends State<ChatScreen> {
       _scrollToBottom();
     } catch (e, stackTrace) {
       debugPrint('エラーが発生しました: $e, $stackTrace');
-      
+
       // thinkingメッセージを削除
       _clearThinking();
-      
+
       setState(() {
         _messages.add(
           ChatMessage(
@@ -345,9 +370,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _showToolList() async {
     await showDialog(
       context: context,
-      builder: (context) => ToolListDialog(
-        mcpManager: _mcpManager,
-      ),
+      builder: (context) => ToolListDialog(mcpManager: _mcpManager),
     );
   }
 
@@ -378,7 +401,9 @@ class _ChatScreenState extends State<ChatScreen> {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                color: Theme.of(
+                  context,
+                ).colorScheme.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(
@@ -390,10 +415,7 @@ class _ChatScreenState extends State<ChatScreen> {
             const SizedBox(width: 12),
             const Text(
               'MCP Assistant',
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 18,
-              ),
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 18),
             ),
           ],
         ),
@@ -406,7 +428,9 @@ class _ChatScreenState extends State<ChatScreen> {
               tooltip: 'ツール一覧を表示',
               style: IconButton.styleFrom(
                 side: BorderSide(
-                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.outline.withValues(alpha: 0.2),
                 ),
               ),
             ),
@@ -419,7 +443,9 @@ class _ChatScreenState extends State<ChatScreen> {
               tooltip: 'AIモデルを変更',
               style: IconButton.styleFrom(
                 side: BorderSide(
-                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.outline.withValues(alpha: 0.2),
                 ),
               ),
             ),
@@ -453,12 +479,19 @@ class _ChatScreenState extends State<ChatScreen> {
               // 現在のモデル表示
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.primaryContainer.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.primary.withValues(alpha: 0.2),
                     width: 1,
                   ),
                 ),
@@ -482,14 +515,20 @@ class _ChatScreenState extends State<ChatScreen> {
                         maxLines: 1,
                       ),
                     ),
-                    if (_currentModel.isExperimental) ...[                      
+                    if (_currentModel.isExperimental) ...[
                       const SizedBox(width: 6),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.orange.shade100,
                           borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: Colors.orange.shade300, width: 0.5),
+                          border: Border.all(
+                            color: Colors.orange.shade300,
+                            width: 0.5,
+                          ),
                         ),
                         child: Text(
                           'BETA',
@@ -509,7 +548,10 @@ class _ChatScreenState extends State<ChatScreen> {
               Expanded(
                 child: ListView.builder(
                   controller: _scrollController,
-                  padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 8.0,
+                    horizontal: 4.0,
+                  ),
                   itemCount: _messages.length,
                   itemBuilder: (context, index) {
                     return AnimatedContainer(
@@ -553,7 +595,9 @@ class _ChatScreenState extends State<ChatScreen> {
                   color: Theme.of(context).colorScheme.surface,
                   border: Border(
                     top: BorderSide(
-                      color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.outline.withValues(alpha: 0.2),
                       width: 1,
                     ),
                   ),
@@ -578,7 +622,9 @@ class _ChatScreenState extends State<ChatScreen> {
                 color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(24),
                 border: Border.all(
-                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.outline.withValues(alpha: 0.2),
                   width: 1,
                 ),
               ),
@@ -592,7 +638,9 @@ class _ChatScreenState extends State<ChatScreen> {
                 decoration: InputDecoration(
                   hintText: 'メッセージを入力...',
                   hintStyle: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
                   ),
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(
@@ -610,7 +658,9 @@ class _ChatScreenState extends State<ChatScreen> {
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
-                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.primary.withValues(alpha: 0.3),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),

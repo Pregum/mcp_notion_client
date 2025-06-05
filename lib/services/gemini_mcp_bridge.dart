@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'package:firebase_ai/firebase_ai.dart';
+import 'package:firebase_ai/firebase_ai.dart' as firebase_ai;
 import 'package:flutter/foundation.dart';
 import 'package:google_generative_ai/google_generative_ai.dart' as gemini;
 import 'package:mcp_client/mcp_client.dart' as mcp_client;
@@ -9,8 +11,8 @@ typedef ThinkingCallback = void Function(ThinkingStep step, String message);
 
 class GeminiMcpBridge {
   final McpClientManager _mcpManager;
-  gemini.GenerativeModel model;
-  final List<gemini.Content> _chatHistory = [];
+  GenerativeModel model;
+  final List<Content> _chatHistory = [];
   ThinkingCallback? _thinkingCallback;
 
   GeminiMcpBridge({
@@ -23,8 +25,8 @@ class GeminiMcpBridge {
   void setThinkingCallback(ThinkingCallback? callback) {
     _thinkingCallback = callback;
   }
-  
-  void updateModel(gemini.GenerativeModel newModel) {
+
+  void updateModel(GenerativeModel newModel) {
     model = newModel;
     // モデル変更時はチャット履歴をクリア
     clearHistory();
@@ -37,7 +39,10 @@ class GeminiMcpBridge {
   }
 
   /// ユーザー入力を渡して思考情報付きの応答を返す
-  Future<StreamingResponse> chatWithThinking(String userPrompt) async {
+  Future<StreamingResponse> chatWithThinking(
+    String userPrompt, {
+    String? modelDisplayName,
+  }) async {
     try {
       // 1) 接続されている全てのMCPクライアントからツール定義を取得
       final allTools = <mcp_client.Tool>[];
@@ -53,45 +58,49 @@ class GeminiMcpBridge {
       // 2) MCP のツール定義を Gemini 用に変換
       final geminiTools = _toGeminiTools(allTools);
       debugPrint(
-        'Gemini Tools: ${geminiTools.map((e) => e.functionDeclarations?.firstOrNull?.name)}',
+        // 'Gemini Tools: ${geminiTools.map((e) => e.functionDeclarations.first.name)}',
+        'Gemini Tools: ${geminiTools.map((e) => e.toJson())}',
       );
 
       // 3) モデルが思考機能をサポートしているかチェック
       // モデル名をデバッグで確認
-      final modelName = model.toString();
+      // final modelName = model.name;
+      final modelName =
+          modelDisplayName ?? _mcpManager.connectedClients.first.name;
       debugPrint('🔍 Current model: $modelName');
-      
+
       // Gemini 2.5モデルの判定（より詳細なチェック）
-      final supportsThinking = modelName.contains('2.5-flash') || 
-                             modelName.contains('2.5-pro') ||
-                             modelName.contains('gemini-2.5');
-      
+      final supportsThinking =
+          modelName.contains('2.5-flash') ||
+          modelName.contains('2.5-pro') ||
+          modelName.contains('Gemini 2.5');
+
       debugPrint('🧠 Supports thinking: $supportsThinking');
       debugPrint('🔍 Model string contains:');
       debugPrint('  - "2.5-flash": ${modelName.contains('2.5-flash')}');
-      debugPrint('  - "2.5-pro": ${modelName.contains('2.5-pro')}'); 
+      debugPrint('  - "2.5-pro": ${modelName.contains('2.5-pro')}');
       debugPrint('  - "gemini-2.5": ${modelName.contains('gemini-2.5')}');
 
       // 4) LLM へ投げる（ユーザー発話）
-      final userContent = gemini.Content.text(userPrompt);
+      final userContent = Content.text(userPrompt);
       _chatHistory.add(userContent);
 
       // ストリーミングで応答を取得
       final response = await _generateStreamingResponse(
-        _chatHistory, 
+        _chatHistory,
         geminiTools,
         supportsThinking: supportsThinking,
       );
-      
+
       if (response.functionCalls.isEmpty) {
-        _chatHistory.add(gemini.Content.text(response.text));
+        _chatHistory.add(Content.text(response.text));
         return response;
       }
 
       // 5) 複数のツール実行を順次処理
-      final toolResults = <gemini.FunctionCall>[];
+      final toolResults = <FunctionCall>[];
       final toolResponses = <Map<String, dynamic>>[];
-      
+
       for (final call in response.functionCalls) {
         mcp_client.CallToolResult? toolResult;
         String? errorMessage;
@@ -101,7 +110,10 @@ class GeminiMcpBridge {
           try {
             final tools = await clientInfo.client.listTools();
             if (tools.any((tool) => tool.name == call.name)) {
-              toolResult = await clientInfo.client.callTool(call.name, call.args);
+              toolResult = await clientInfo.client.callTool(
+                call.name,
+                call.args,
+              );
               break;
             }
           } catch (e) {
@@ -111,10 +123,13 @@ class GeminiMcpBridge {
         }
 
         if (toolResult == null) {
-          debugPrint('Tool ${call.name} not found in any connected MCP server: $errorMessage');
+          debugPrint(
+            'Tool ${call.name} not found in any connected MCP server: $errorMessage',
+          );
           // ツールが見つからなくても続行
           toolResponses.add({
-            'result': 'ツール ${call.name} が見つかりませんでした: ${errorMessage ?? 'Unknown error'}'
+            'result':
+                'ツール ${call.name} が見つかりませんでした: ${errorMessage ?? 'Unknown error'}',
           });
           continue;
         }
@@ -136,7 +151,7 @@ class GeminiMcpBridge {
                 case 'notion':
                   if (errorJson['code'] == 'unauthorized') {
                     toolResponses.add({
-                      'result': 'NotionのAPIトークンが無効です。有効なAPIトークンを設定してください。'
+                      'result': 'NotionのAPIトークンが無効です。有効なAPIトークンを設定してください。',
                     });
                     continue;
                   }
@@ -145,12 +160,12 @@ class GeminiMcpBridge {
                 case 'spotify':
                   if (errorJson['code'] == 'unauthorized') {
                     toolResponses.add({
-                      'result': 'Spotifyのアクセストークンが無効です。再認証が必要です。'
+                      'result': 'Spotifyのアクセストークンが無効です。再認証が必要です。',
                     });
                     continue;
                   } else if (errorJson['code'] == 'rate_limit') {
                     toolResponses.add({
-                      'result': 'Spotifyのレート制限に達しました。しばらく待ってから再試行してください。'
+                      'result': 'Spotifyのレート制限に達しました。しばらく待ってから再試行してください。',
                     });
                     continue;
                   }
@@ -158,7 +173,7 @@ class GeminiMcpBridge {
 
                 default:
                   toolResponses.add({
-                    'result': 'エラーが発生しました: ${errorJson['message']}'
+                    'result': 'エラーが発生しました: ${errorJson['message']}',
                   });
                   continue;
               }
@@ -175,24 +190,27 @@ class GeminiMcpBridge {
       // 6) 実行結果を LLM に返し、要約を生成
       final followUpContent = [
         ..._chatHistory,
-        gemini.Content.text('以下の実行結果を日本語で分かりやすく要約してください：'),
-        gemini.Content.model(toolResults),
+        Content.text('以下の実行結果を日本語で分かりやすく要約してください：'),
+        Content.model(toolResults),
       ];
-      
+
       // 各ツールの実行結果を追加
       for (int i = 0; i < toolResults.length; i++) {
         followUpContent.add(
-          gemini.Content.functionResponse(toolResults[i].name, toolResponses[i])
+          Content.functionResponse(
+            toolResults[i].name,
+            toolResponses[i],
+          ),
         );
       }
-      
+
       final followUpResponse = await _generateStreamingResponse(
-        followUpContent, 
+        followUpContent,
         [],
         supportsThinking: supportsThinking,
       );
 
-      _chatHistory.add(gemini.Content.text(followUpResponse.text));
+      _chatHistory.add(Content.text(followUpResponse.text));
       return followUpResponse;
     } catch (e, stackTrace) {
       debugPrint('Error in chat: $e\n$stackTrace');
@@ -208,24 +226,26 @@ class GeminiMcpBridge {
   }
 
   /// MCP → Gemini ツール変換
-  List<gemini.Tool> _toGeminiTools(List<mcp_client.Tool> infos) =>
+  List<Tool> _toGeminiTools(List<mcp_client.Tool> infos) =>
       infos.map((t) {
         // JSON Schema → Schema クラス（v0.4.2+）
-        final schema = gemini.Schema.object(
+        final schema = Schema.object(
           properties: _convertToGeminiSchema(t.inputSchema),
         );
 
-        return gemini.Tool(
-          functionDeclarations: [
-            gemini.FunctionDeclaration(t.name, t.description, schema),
+        return Tool.functionDeclarations(
+          [
+            FunctionDeclaration(
+              t.name,
+              t.description,
+              parameters: {'inputSchema': schema},
+            ),
           ],
         );
       }).toList();
 
   /// NotionのスキーマをGeminiのスキーマに変換
-  Map<String, gemini.Schema> _convertToGeminiSchema(
-    Map<String, dynamic> schema,
-  ) {
+  Map<String, Schema> _convertToGeminiSchema(Map<String, dynamic> schema) {
     // スキーマがプリミティブ型の場合
     if (schema['type'] != null && !schema.containsKey('properties')) {
       return {'value': _createBasicSchema(schema['type'] as String)};
@@ -233,43 +253,41 @@ class GeminiMcpBridge {
 
     // propertiesが存在しない場合は空のオブジェクトを返す
     final properties = schema['properties'] as Map<String, dynamic>? ?? {};
-    final convertedProperties = <String, gemini.Schema>{};
+    final convertedProperties = <String, Schema>{};
 
     properties.forEach((key, value) {
       if (value == null) {
-        convertedProperties[key] = gemini.Schema.string(); // デフォルト値
+        convertedProperties[key] = Schema.string(); // デフォルト値
         return;
       }
 
       final type = value['type'] as String? ?? 'string';
       switch (type) {
         case 'string':
-          convertedProperties[key] = gemini.Schema.string();
+          convertedProperties[key] = Schema.string();
           break;
         case 'object':
           if (value is! Map<String, dynamic>) {
-            convertedProperties[key] = gemini.Schema.object(properties: {});
+            convertedProperties[key] = Schema.object(properties: {});
           } else {
-            convertedProperties[key] = gemini.Schema.object(
+            convertedProperties[key] = Schema.object(
               properties: _convertToGeminiSchema(value),
             );
           }
           break;
         case 'array':
           if (value['items'] == null) {
-            convertedProperties[key] = gemini.Schema.array(
-              items: gemini.Schema.string(),
-            );
+            convertedProperties[key] = Schema.array(items: Schema.string());
           } else {
             final itemSchema = value['items'] as Map<String, dynamic>;
             final itemType = itemSchema['type'] as String? ?? 'string';
-            convertedProperties[key] = gemini.Schema.array(
+            convertedProperties[key] = Schema.array(
               items: _createBasicSchema(itemType),
             );
           }
           break;
         default:
-          convertedProperties[key] = gemini.Schema.string();
+          convertedProperties[key] = Schema.string();
       }
     });
 
@@ -277,133 +295,149 @@ class GeminiMcpBridge {
   }
 
   /// 基本的なスキーマタイプを作成
-  gemini.Schema _createBasicSchema(String type) {
+  Schema _createBasicSchema(String type) {
     switch (type) {
       case 'string':
-        return gemini.Schema.string();
+        return Schema.string();
       case 'number':
-        return gemini.Schema.number();
+        return Schema.number();
       case 'integer':
-        return gemini.Schema.integer();
+        return Schema.integer();
       case 'boolean':
-        return gemini.Schema.boolean();
+        return Schema.boolean();
       case 'object':
-        return gemini.Schema.object(properties: {});
+        return Schema.object(properties: {});
       case 'array':
-        return gemini.Schema.array(items: gemini.Schema.string());
+        return Schema.array(items: Schema.string());
       default:
-        return gemini.Schema.string();
+        return Schema.string();
     }
   }
-  
+
   void _notifyThinking(ThinkingStep step, String message) {
     _thinkingCallback?.call(step, message);
   }
-  
+
   /// ストリーミング応答を処理
   Future<StreamingResponse> _generateStreamingResponse(
-    List<gemini.Content> contents,
-    List<gemini.Tool> tools, {
+    List<Content> contents,
+    List<Tool> tools, {
     required bool supportsThinking,
   }) async {
     final result = StreamingResponse();
     var currentThoughts = '';
     var currentAnswer = '';
-    
+
     try {
       // ストリーミングで応答を取得
       final responseStream = model.generateContentStream(
         contents,
         tools: tools,
+        toolConfig: ToolConfig(),
       );
-      
+
       await for (final chunk in responseStream) {
         if (chunk.candidates.isEmpty) {
           debugPrint('🔍 Empty chunk received');
           continue;
         }
-        
+
         final candidate = chunk.candidates.first;
-        debugPrint('🔍 Processing chunk with ${candidate.content.parts.length} parts');
-        
+        debugPrint(
+          '🔍 Processing chunk with ${candidate.content.parts.length} parts',
+        );
+
         // Function callsの処理
         for (final call in chunk.functionCalls) {
           result.functionCalls.add(call);
           debugPrint('🔧 Function call: ${call.name}');
         }
-        
+
         // テキストコンテンツの処理
         for (final part in candidate.content.parts) {
           try {
             final partMap = part.toJson() as Map<String, dynamic>;
             debugPrint('🔍 Part JSON: $partMap');
-            
+
             // thought属性が存在するかチェック（Gemini 2.5での実装）
-            if (supportsThinking && partMap.containsKey('thought') && partMap['thought'] == true) {
+            if (supportsThinking &&
+                partMap.containsKey('thought') &&
+                partMap['thought'] == true) {
               debugPrint('🧠 Found thinking part!');
               if (partMap.containsKey('text')) {
                 final thinkingText = partMap['text'] as String;
                 currentThoughts += thinkingText;
-                debugPrint('🧠 Thinking content (+${thinkingText.length} chars): ${thinkingText.substring(0, thinkingText.length > 100 ? 100 : thinkingText.length)}...');
-                
+                debugPrint(
+                  '🧠 Thinking content (+${thinkingText.length} chars): ${thinkingText.substring(0, thinkingText.length > 100 ? 100 : thinkingText.length)}...',
+                );
+
                 // 実際の思考情報が取得できた場合のみUIに通知
                 if (currentThoughts.isNotEmpty) {
                   debugPrint('🧠 Notifying UI with thinking content');
-                  _thinkingCallback?.call(ThinkingStep.planning, currentThoughts);
+                  _thinkingCallback?.call(
+                    ThinkingStep.planning,
+                    currentThoughts,
+                  );
                 }
               }
             } else if (partMap.containsKey('text')) {
               // 通常のテキスト（回答）
               final answerText = partMap['text'] as String;
               currentAnswer += answerText;
-              debugPrint('💬 Answer content (+${answerText.length} chars): ${answerText.substring(0, answerText.length > 100 ? 100 : answerText.length)}...');
+              debugPrint(
+                '💬 Answer content (+${answerText.length} chars): ${answerText.substring(0, answerText.length > 100 ? 100 : answerText.length)}...',
+              );
             }
-            
+
             // 思考機能が有効な場合の詳細ログ
             if (supportsThinking) {
               debugPrint('🔍 Part analysis:');
-              debugPrint('  - Has "thought" key: ${partMap.containsKey('thought')}');
+              debugPrint(
+                '  - Has "thought" key: ${partMap.containsKey('thought')}',
+              );
               debugPrint('  - "thought" value: ${partMap['thought']}');
               debugPrint('  - Has "text" key: ${partMap.containsKey('text')}');
               debugPrint('  - Keys: ${partMap.keys.toList()}');
             }
-            
           } catch (e) {
             // JSON変換エラーの場合はテキストとして処理
             final text = part.toString();
             if (text.isNotEmpty) {
               currentAnswer += text;
-              debugPrint('📝 Fallback text (+${text.length} chars): ${text.substring(0, text.length > 100 ? 100 : text.length)}...');
+              debugPrint(
+                '📝 Fallback text (+${text.length} chars): ${text.substring(0, text.length > 100 ? 100 : text.length)}...',
+              );
             }
             debugPrint('❌ Part parsing error: $e');
           }
         }
       }
-      
+
       result.thoughts = currentThoughts;
       result.text = currentAnswer;
-      
+
       // 最終結果のデバッグ情報
       debugPrint('🏁 Final results:');
       debugPrint('  - Thoughts length: ${currentThoughts.length} chars');
       debugPrint('  - Answer length: ${currentAnswer.length} chars');
       debugPrint('  - Has thoughts: ${currentThoughts.isNotEmpty}');
       debugPrint('  - Has answer: ${currentAnswer.isNotEmpty}');
-      
+
       if (currentThoughts.isNotEmpty) {
-        debugPrint('🧠 Final thinking content preview: ${currentThoughts.substring(0, currentThoughts.length > 200 ? 200 : currentThoughts.length)}...');
+        debugPrint(
+          '🧠 Final thinking content preview: ${currentThoughts.substring(0, currentThoughts.length > 200 ? 200 : currentThoughts.length)}...',
+        );
       }
-      
+
       if (currentThoughts.isNotEmpty || currentAnswer.isNotEmpty) {
         debugPrint('🏁 Notifying completion');
         _notifyThinking(ThinkingStep.completed, '完了しました');
       }
-      
     } catch (e) {
       debugPrint('Error in streaming response: $e');
       result.text = 'ストリーミング処理中にエラーが発生しました: $e';
     }
-    
+
     return result;
   }
 }
@@ -412,5 +446,5 @@ class GeminiMcpBridge {
 class StreamingResponse {
   String thoughts = '';
   String text = '';
-  final List<gemini.FunctionCall> functionCalls = [];
+  final List<FunctionCall> functionCalls = [];
 }
