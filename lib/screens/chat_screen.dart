@@ -13,6 +13,7 @@ import '../components/add_server_dialog.dart';
 import '../models/gemini_model_config.dart';
 import '../components/model_selector_dialog.dart';
 import '../components/tool_list_dialog.dart';
+import '../components/tool_execution_panel.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -36,6 +37,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
   // モデル関連の状態
   GeminiModelConfig _currentModel = GeminiModelConfig.defaultModel;
+  
+  // ツール実行パネルの表示状態
+  bool _showToolPanel = false;
 
   @override
   void initState() {
@@ -438,6 +442,28 @@ class _ChatScreenState extends State<ChatScreen> {
           Container(
             margin: const EdgeInsets.only(right: 4),
             child: IconButton.outlined(
+              icon: Icon(_showToolPanel ? Icons.close_rounded : Icons.settings_applications_rounded),
+              onPressed: () {
+                setState(() {
+                  _showToolPanel = !_showToolPanel;
+                });
+              },
+              tooltip: _showToolPanel ? 'ツール実行パネルを閉じる' : 'ツール実行パネルを開く',
+              style: IconButton.styleFrom(
+                side: BorderSide(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.outline.withValues(alpha: 0.2),
+                ),
+                backgroundColor: _showToolPanel 
+                    ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3)
+                    : null,
+              ),
+            ),
+          ),
+          Container(
+            margin: const EdgeInsets.only(right: 4),
+            child: IconButton.outlined(
               icon: const Icon(Icons.psychology_rounded),
               onPressed: _changeModel,
               tooltip: 'AIモデルを変更',
@@ -544,6 +570,22 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
               ),
               const Divider(),
+              // ツール実行パネル
+              if (_showToolPanel)
+                ToolExecutionPanel(
+                  mcpManager: _mcpManager,
+                  onResultUpdate: (result) {
+                    setState(() {
+                      _messages.add(
+                        ChatMessage(
+                          text: 'ツール実行結果:\n$result',
+                          isUser: false,
+                        ),
+                      );
+                    });
+                    _scrollToBottom();
+                  },
+                ),
               // 既存のチャットUI
               Expanded(
                 child: ListView.builder(
