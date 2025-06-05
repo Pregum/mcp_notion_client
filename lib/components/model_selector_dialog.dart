@@ -59,10 +59,13 @@ class _ModelSelectorDialogState extends State<ModelSelectorDialog> {
                 ),
                 title: Row(
                   children: [
-                    Text(
-                      model.displayName,
-                      style: TextStyle(
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    Expanded(
+                      child: Text(
+                        model.displayName,
+                        style: TextStyle(
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     ),
                     if (model.isExperimental) ...[

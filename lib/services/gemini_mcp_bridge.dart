@@ -70,7 +70,7 @@ class GeminiMcpBridge {
         tools: geminiTools,
       );
 
-      // デバッグ出力を追加
+      // デバッグ出力を追加（thinking情報も確認）
       debugPrint('=== GenerateContentResponse ===');
       debugPrint('Candidates: ${first.candidates.length}件');
       for (var i = 0; i < first.candidates.length; i++) {
@@ -79,6 +79,16 @@ class GeminiMcpBridge {
         debugPrint('  - Text: ${candidate.text}');
         debugPrint('  - Finish Reason: ${candidate.finishReason}');
         debugPrint('  - Finish Message: ${candidate.finishMessage}');
+        
+        // Content partsを詳しく確認（thinking情報が含まれている可能性）
+        if (candidate.content.parts.isNotEmpty) {
+          debugPrint('  - Content Parts: ${candidate.content.parts.length}件');
+          for (var j = 0; j < candidate.content.parts.length; j++) {
+            final part = candidate.content.parts[j];
+            debugPrint('    Part $j: ${part.toString()}');
+          }
+        }
+        
         if (candidate.safetyRatings != null) {
           debugPrint('  - Safety Ratings:');
           for (final rating in candidate.safetyRatings!) {
@@ -119,6 +129,9 @@ class GeminiMcpBridge {
       }
       debugPrint('===========================');
 
+      // Thinking情報の抽出を試行
+      _extractThinkingFromResponse(first);
+      
       // 4) 関数呼び出しがあるか確認
       final call =
           first.functionCalls.isNotEmpty ? first.functionCalls.first : null;
@@ -303,5 +316,26 @@ class GeminiMcpBridge {
   
   void _notifyThinking(ThinkingStep step, String message) {
     _thinkingCallback?.call(step, message);
+  }
+  
+  /// Gemini APIレスポンスからthinking情報を抽出（実験的）
+  void _extractThinkingFromResponse(gemini.GenerateContentResponse response) {
+    try {
+      for (final candidate in response.candidates) {
+        for (final part in candidate.content.parts) {
+          // thinking情報が含まれている可能性のあるpartを確認
+          final partText = part.toString();
+          debugPrint('Checking part for thinking: $partText');
+          
+          // Thinking専用モデルからの特別な情報があるかチェック
+          if (partText.contains('thinking') || partText.contains('思考')) {
+            debugPrint('Potential thinking content found: $partText');
+            // 実際のthinking情報が見つかった場合の処理をここに追加
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error extracting thinking info: $e');
+    }
   }
 }
