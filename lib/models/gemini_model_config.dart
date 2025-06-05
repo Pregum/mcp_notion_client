@@ -78,6 +78,21 @@ class GeminiModelConfig {
       description: '安定版モデル、実用性重視',
       supportsFunctionCalling: true,
     ),
+    // Gemini 2.5 モデル (thinking機能対応)
+    GeminiModelConfig(
+      modelId: 'models/gemini-2.5-pro',
+      displayName: 'Gemini 2.5 Pro',
+      description: '最新高性能モデル、thinking機能対応',
+      supportsFunctionCalling: true,
+      isExperimental: true,
+    ),
+    GeminiModelConfig(
+      modelId: 'models/gemini-2.5-flash',
+      displayName: 'Gemini 2.5 Flash',
+      description: '最新高速モデル、thinking機能対応',
+      supportsFunctionCalling: true,
+      isExperimental: true,
+    ),
   ];
 
   static GeminiModelConfig getModelById(String modelId) {

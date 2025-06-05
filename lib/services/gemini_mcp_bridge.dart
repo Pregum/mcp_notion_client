@@ -30,19 +30,16 @@ class GeminiMcpBridge {
     clearHistory();
   }
 
-  /// ユーザー入力を渡して最終テキストを返す
+  /// ユーザー入力を渡して最終テキストを返す（ストリーミング対応）
   Future<String> chat(String userPrompt) async {
-    try {
-      // Thinking step 1: ユーザー入力の理解
-      _notifyThinking(ThinkingStep.understanding, 'ユーザーの質問を分析しています...');
-      
-      // // 接続されているMCPクライアントがない場合はエラー
-      // if (!_mcpManager.isAnyServerConnected()) {
-      //   throw Exception('No connected MCP servers available');
-      // }
+    final response = await chatWithThinking(userPrompt);
+    return response.text;
+  }
 
+  /// ユーザー入力を渡して思考情報付きの応答を返す
+  Future<StreamingResponse> chatWithThinking(String userPrompt) async {
+    try {
       // 1) 接続されている全てのMCPクライアントからツール定義を取得
-      _notifyThinking(ThinkingStep.planning, '利用可能なツールを確認しています...');
       final allTools = <mcp_client.Tool>[];
       for (final clientInfo in _mcpManager.connectedClients) {
         try {
@@ -58,86 +55,25 @@ class GeminiMcpBridge {
       debugPrint(
         'Gemini Tools: ${geminiTools.map((e) => e.functionDeclarations?.firstOrNull?.name)}',
       );
-      
-      _notifyThinking(ThinkingStep.planning, '実行計画を立てています...');
 
-      // 3) LLM へ投げる（ユーザー発話）
+      // 3) モデルが思考機能をサポートしているかチェック（現在は無効化）
+      final supportsThinking = false; // Gemini 2.5の思考機能は今後対応予定
+      
+      debugPrint('Supports thinking: $supportsThinking');
+
+      // 4) LLM へ投げる（ユーザー発話）
       final userContent = gemini.Content.text(userPrompt);
       _chatHistory.add(userContent);
 
-      final first = await model.generateContent(
-        _chatHistory,
-        tools: geminiTools,
+      // ストリーミングで応答を取得
+      final response = await _generateStreamingResponse(
+        _chatHistory, 
+        geminiTools,
+        supportsThinking: supportsThinking,
       );
-
-      // デバッグ出力を追加（thinking情報も確認）
-      debugPrint('=== GenerateContentResponse ===');
-      debugPrint('Candidates: ${first.candidates.length}件');
-      for (var i = 0; i < first.candidates.length; i++) {
-        final candidate = first.candidates[i];
-        debugPrint('Candidate $i:');
-        debugPrint('  - Text: ${candidate.text}');
-        debugPrint('  - Finish Reason: ${candidate.finishReason}');
-        debugPrint('  - Finish Message: ${candidate.finishMessage}');
-        
-        // Content partsを詳しく確認（thinking情報が含まれている可能性）
-        if (candidate.content.parts.isNotEmpty) {
-          debugPrint('  - Content Parts: ${candidate.content.parts.length}件');
-          for (var j = 0; j < candidate.content.parts.length; j++) {
-            final part = candidate.content.parts[j];
-            debugPrint('    Part $j: ${part.toString()}');
-          }
-        }
-        
-        if (candidate.safetyRatings != null) {
-          debugPrint('  - Safety Ratings:');
-          for (final rating in candidate.safetyRatings!) {
-            debugPrint(
-              '    * Category: ${rating.category}, Probability: ${rating.probability}',
-            );
-          }
-        }
-      }
-
-      if (first.promptFeedback != null) {
-        debugPrint('Prompt Feedback:');
-        debugPrint('  - Block Reason: ${first.promptFeedback?.blockReason}');
-        debugPrint(
-          '  - Block Reason Message: ${first.promptFeedback?.blockReasonMessage}',
-        );
-        if (first.promptFeedback?.safetyRatings.isNotEmpty ?? false) {
-          debugPrint('  - Safety Ratings:');
-          for (final rating in first.promptFeedback!.safetyRatings) {
-            debugPrint(
-              '    * Category: ${rating.category}, Probability: ${rating.probability}',
-            );
-          }
-        }
-      }
-
-      if (first.usageMetadata != null) {
-        debugPrint('Usage Metadata:');
-        debugPrint(
-          '  - Prompt Token Count: ${first.usageMetadata?.promptTokenCount}',
-        );
-        debugPrint(
-          '  - Candidates Token Count: ${first.usageMetadata?.candidatesTokenCount}',
-        );
-        debugPrint(
-          '  - Total Token Count: ${first.usageMetadata?.totalTokenCount}',
-        );
-      }
-      debugPrint('===========================');
-
-      // Thinking情報の抽出を試行
-      _extractThinkingFromResponse(first);
       
-      // 4) 関数呼び出しがあるか確認
-      final functionCalls = first.functionCalls.toList();
-      if (functionCalls.isEmpty) {
-        _notifyThinking(ThinkingStep.completed, '回答を生成しました');
-        final response = first.text ?? '';
-        _chatHistory.add(gemini.Content.text(response));
+      if (response.functionCalls.isEmpty) {
+        _chatHistory.add(gemini.Content.text(response.text));
         return response;
       }
 
@@ -145,8 +81,7 @@ class GeminiMcpBridge {
       final toolResults = <gemini.FunctionCall>[];
       final toolResponses = <Map<String, dynamic>>[];
       
-      for (final call in functionCalls) {
-        _notifyThinking(ThinkingStep.executing, '${call.name}ツールを実行しています...');
+      for (final call in response.functionCalls) {
         mcp_client.CallToolResult? toolResult;
         String? errorMessage;
 
@@ -227,8 +162,6 @@ class GeminiMcpBridge {
       }
 
       // 6) 実行結果を LLM に返し、要約を生成
-      _notifyThinking(ThinkingStep.completed, '実行結果を整理して回答を生成しています...');
-      
       final followUpContent = [
         ..._chatHistory,
         gemini.Content.text('以下の実行結果を日本語で分かりやすく要約してください：'),
@@ -242,14 +175,19 @@ class GeminiMcpBridge {
         );
       }
       
-      final followUp = await model.generateContent(followUpContent);
+      final followUpResponse = await _generateStreamingResponse(
+        followUpContent, 
+        [],
+        supportsThinking: supportsThinking,
+      );
 
-      final response = followUp.text ?? 'レスポンスを生成できませんでした。';
-      _chatHistory.add(gemini.Content.text(response));
-      return response;
+      _chatHistory.add(gemini.Content.text(followUpResponse.text));
+      return followUpResponse;
     } catch (e, stackTrace) {
       debugPrint('Error in chat: $e\n$stackTrace');
-      return 'エラーが発生しました: $e';
+      final errorResponse = StreamingResponse();
+      errorResponse.text = 'エラーが発生しました: $e';
+      return errorResponse;
     }
   }
 
@@ -351,24 +289,84 @@ class GeminiMcpBridge {
     _thinkingCallback?.call(step, message);
   }
   
-  /// Gemini APIレスポンスからthinking情報を抽出（実験的）
-  void _extractThinkingFromResponse(gemini.GenerateContentResponse response) {
+  /// ストリーミング応答を処理
+  Future<StreamingResponse> _generateStreamingResponse(
+    List<gemini.Content> contents,
+    List<gemini.Tool> tools, {
+    required bool supportsThinking,
+  }) async {
+    final result = StreamingResponse();
+    var currentThoughts = '';
+    var currentAnswer = '';
+    
     try {
-      for (final candidate in response.candidates) {
+      // ストリーミングで応答を取得
+      final responseStream = model.generateContentStream(
+        contents,
+        tools: tools,
+      );
+      
+      await for (final chunk in responseStream) {
+        if (chunk.candidates.isEmpty) continue;
+        
+        final candidate = chunk.candidates.first;
+        
+        // Function callsの処理
+        for (final call in chunk.functionCalls) {
+          result.functionCalls.add(call);
+        }
+        
+        // テキストコンテンツの処理
         for (final part in candidate.content.parts) {
-          // thinking情報が含まれている可能性のあるpartを確認
-          final partText = part.toString();
-          debugPrint('Checking part for thinking: $partText');
-          
-          // Thinking専用モデルからの特別な情報があるかチェック
-          if (partText.contains('thinking') || partText.contains('思考')) {
-            debugPrint('Potential thinking content found: $partText');
-            // 実際のthinking情報が見つかった場合の処理をここに追加
+          try {
+            final partMap = part.toJson() as Map<String, dynamic>;
+            
+            // thought属性が存在するかチェック（Gemini 2.5での実装）
+            if (supportsThinking && partMap.containsKey('thought') && partMap['thought'] == true) {
+              if (partMap.containsKey('text')) {
+                currentThoughts += partMap['text'] as String;
+                // 実際の思考情報が取得できた場合のみUIに通知
+                if (currentThoughts.isNotEmpty) {
+                  _thinkingCallback?.call(ThinkingStep.planning, currentThoughts);
+                }
+              }
+            } else if (partMap.containsKey('text')) {
+              // 通常のテキスト（回答）
+              currentAnswer += partMap['text'] as String;
+            }
+            
+            // デバッグ出力
+            debugPrint('Part: $partMap');
+          } catch (e) {
+            // JSON変換エラーの場合はテキストとして処理
+            final text = part.toString();
+            if (text.isNotEmpty) {
+              currentAnswer += text;
+            }
+            debugPrint('Part parsing error: $e');
           }
         }
       }
+      
+      result.thoughts = currentThoughts;
+      result.text = currentAnswer;
+      
+      if (currentThoughts.isNotEmpty || currentAnswer.isNotEmpty) {
+        _notifyThinking(ThinkingStep.completed, '完了しました');
+      }
+      
     } catch (e) {
-      debugPrint('Error extracting thinking info: $e');
+      debugPrint('Error in streaming response: $e');
+      result.text = 'ストリーミング処理中にエラーが発生しました: $e';
     }
+    
+    return result;
   }
+}
+
+/// ストリーミング応答の結果を格納するクラス
+class StreamingResponse {
+  String thoughts = '';
+  String text = '';
+  final List<gemini.FunctionCall> functionCalls = [];
 }

@@ -13,6 +13,7 @@ class ChatMessage extends StatelessWidget {
   final bool isThinking;
   final ThinkingStep? currentStep;
   final List<String>? thinkingSteps;
+  final String? actualThoughts; // 実際の思考内容
 
   const ChatMessage({
     super.key,
@@ -21,6 +22,7 @@ class ChatMessage extends StatelessWidget {
     this.isThinking = false,
     this.currentStep,
     this.thinkingSteps,
+    this.actualThoughts,
   });
 
   const ChatMessage.thinking({
@@ -29,7 +31,17 @@ class ChatMessage extends StatelessWidget {
     required this.thinkingSteps,
   }) : text = '',
        isUser = false,
-       isThinking = true;
+       isThinking = true,
+       actualThoughts = null;
+
+  const ChatMessage.withThoughts({
+    super.key,
+    required this.text,
+    required this.actualThoughts,
+  }) : isUser = false,
+       isThinking = false,
+       currentStep = null,
+       thinkingSteps = null;
 
   @override
   Widget build(BuildContext context) {
@@ -56,42 +68,51 @@ class ChatMessage extends StatelessWidget {
             const SizedBox(width: 8),
           ],
           Flexible(
-            child: Container(
-              constraints: BoxConstraints(
-                maxWidth: MediaQuery.of(context).size.width * 0.8,
-                minWidth: 100,
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-              decoration: BoxDecoration(
-                color: isUser
-                    ? Theme.of(context).colorScheme.primary
-                    : Theme.of(context).colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(18),
-                  topRight: const Radius.circular(18),
-                  bottomLeft: Radius.circular(isUser ? 18 : 4),
-                  bottomRight: Radius.circular(isUser ? 4 : 18),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
+            child: Column(
+              crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+              children: [
+                // 思考内容の表示（展開可能）
+                if (actualThoughts != null && actualThoughts!.isNotEmpty)
+                  _buildThoughtsSection(context),
+                // メッセージ本文
+                Container(
+                  constraints: BoxConstraints(
+                    maxWidth: MediaQuery.of(context).size.width * 0.8,
+                    minWidth: 100,
                   ),
-                ],
-              ),
-              child: SelectableText(
-                text,
-                style: TextStyle(
-                  color: isUser
-                      ? Theme.of(context).colorScheme.onPrimary
-                      : Theme.of(context).colorScheme.onSurfaceVariant,
-                  fontSize: 15,
-                  height: 1.4,
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                  decoration: BoxDecoration(
+                    color: isUser
+                        ? Theme.of(context).colorScheme.primary
+                        : Theme.of(context).colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.only(
+                      topLeft: const Radius.circular(18),
+                      topRight: const Radius.circular(18),
+                      bottomLeft: Radius.circular(isUser ? 18 : 4),
+                      bottomRight: Radius.circular(isUser ? 4 : 18),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.05),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: SelectableText(
+                    text,
+                    style: TextStyle(
+                      color: isUser
+                          ? Theme.of(context).colorScheme.onPrimary
+                          : Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontSize: 15,
+                      height: 1.4,
+                    ),
+                    textAlign: TextAlign.left,
+                    textWidthBasis: TextWidthBasis.longestLine,
+                  ),
                 ),
-                textAlign: TextAlign.left,
-                textWidthBasis: TextWidthBasis.longestLine,
-              ),
+              ],
             ),
           ),
           if (isUser) ...[
@@ -214,6 +235,74 @@ class ChatMessage extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildThoughtsSection(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8.0),
+      constraints: BoxConstraints(
+        maxWidth: MediaQuery.of(context).size.width * 0.8,
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
+          childrenPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+          backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+          collapsedBackgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12.0),
+            side: BorderSide(
+              color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+              width: 1,
+            ),
+          ),
+          collapsedShape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12.0),
+            side: BorderSide(
+              color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+              width: 1,
+            ),
+          ),
+          leading: Icon(
+            Icons.psychology_outlined,
+            size: 18,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          title: Text(
+            '思考プロセス',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12.0),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(8.0),
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.1),
+                  width: 1,
+                ),
+              ),
+              child: SelectableText(
+                actualThoughts!,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  fontSize: 13,
+                  fontFamily: 'monospace',
+                  height: 1.4,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

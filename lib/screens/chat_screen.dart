@@ -32,12 +32,6 @@ class _ChatScreenState extends State<ChatScreen> {
   
   // Thinking関連の状態
   ChatMessage? _currentThinkingMessage;
-  final List<String> _thinkingSteps = [
-    'ユーザーの質問を分析中',
-    '実行計画を立案中', 
-    'ツールを実行中',
-    '回答を生成中'
-  ];
   
   // モデル関連の状態
   GeminiModelConfig _currentModel = GeminiModelConfig.defaultModel;
@@ -149,27 +143,31 @@ class _ChatScreenState extends State<ChatScreen> {
   }
   
   void _handleThinking(ThinkingStep step, String message) {
-    setState(() {
-      if (_currentThinkingMessage == null) {
-        // 初回のthinkingメッセージを作成
-        _currentThinkingMessage = ChatMessage.thinking(
-          currentStep: step,
-          thinkingSteps: _thinkingSteps,
-        );
-        _messages.add(_currentThinkingMessage!);
-      } else {
-        // 既存のthinkingメッセージを更新
-        final index = _messages.indexOf(_currentThinkingMessage!);
-        if (index != -1) {
-          _messages[index] = ChatMessage.thinking(
+    // 実際の思考情報がある場合のみ表示（疑似的な思考ステップは表示しない）
+    if (step == ThinkingStep.planning && message.length > 50) {
+      // 十分な思考内容がある場合のみ表示
+      setState(() {
+        if (_currentThinkingMessage == null) {
+          // 初回のthinkingメッセージを作成
+          _currentThinkingMessage = ChatMessage.thinking(
             currentStep: step,
-            thinkingSteps: _thinkingSteps,
+            thinkingSteps: ['思考中...'],
           );
-          _currentThinkingMessage = _messages[index];
+          _messages.add(_currentThinkingMessage!);
+        } else {
+          // 既存のthinkingメッセージを更新
+          final index = _messages.indexOf(_currentThinkingMessage!);
+          if (index != -1) {
+            _messages[index] = ChatMessage.thinking(
+              currentStep: step,
+              thinkingSteps: ['思考中...'],
+            );
+            _currentThinkingMessage = _messages[index];
+          }
         }
-      }
-    });
-    _scrollToBottom();
+      });
+      _scrollToBottom();
+    }
   }
   
   void _clearThinking() {
@@ -208,15 +206,38 @@ class _ChatScreenState extends State<ChatScreen> {
       //   return;
       // }
 
-      final response = _currentModel.isFirebaseAi && _firebaseBridge != null
-          ? await _firebaseBridge!.chat(text)
-          : await _bridge.chat(text);
+      // 思考情報付きレスポンスを取得
+      final thinkingResponse = _currentModel.isFirebaseAi && _firebaseBridge != null
+          ? null // Firebase AIは現在思考情報をサポートしていない
+          : await _bridge.chatWithThinking(text);
+      
+      String responseText;
+      String? thinkingContent;
+      
+      if (thinkingResponse != null) {
+        // Google Generative AI (思考情報対応)
+        responseText = thinkingResponse.text;
+        thinkingContent = thinkingResponse.thoughts.isNotEmpty ? thinkingResponse.thoughts : null;
+      } else {
+        // Firebase AI (通常の応答)
+        responseText = await _firebaseBridge!.chat(text);
+        thinkingContent = null;
+      }
       
       // thinkingメッセージを削除して回答を追加
       _clearThinking();
       
       setState(() {
-        _messages.add(ChatMessage(text: response, isUser: false));
+        if (thinkingContent != null && thinkingContent.isNotEmpty) {
+          // 思考情報付きメッセージ
+          _messages.add(ChatMessage.withThoughts(
+            text: responseText,
+            actualThoughts: thinkingContent,
+          ));
+        } else {
+          // 通常のメッセージ
+          _messages.add(ChatMessage(text: responseText, isUser: false));
+        }
         _isLoading = false;
       });
       _scrollToBottom();
