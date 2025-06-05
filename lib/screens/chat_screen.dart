@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:google_generative_ai/google_generative_ai.dart' as google_ai;
+import 'package:firebase_ai/firebase_ai.dart' as firebase_ai;
 import 'package:mcp_notion_client/models/mcp_server_status.dart';
 import '../services/gemini_mcp_bridge.dart';
+import '../services/firebase_ai_bridge.dart';
+import '../services/firebase_ai_service.dart';
 import '../models/chat_message.dart';
 import '../components/server_status_panel.dart';
 import '../services/mcp_client_manager.dart';
@@ -24,6 +27,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final ScrollController _scrollController = ScrollController();
   late McpClientManager _mcpManager;
   late GeminiMcpBridge _bridge;
+  FirebaseAiBridge? _firebaseBridge;
   
   // Thinking関連の状態
   ChatMessage? _currentThinkingMessage;
@@ -43,13 +47,31 @@ class _ChatScreenState extends State<ChatScreen> {
     _initializeMcpClient();
   }
 
-  Future<GenerativeModel> prepareGemini([GeminiModelConfig? modelConfig]) async {
+  Future<dynamic> prepareModel([GeminiModelConfig? modelConfig]) async {
     final config = modelConfig ?? _currentModel;
-    final geminiModel = GenerativeModel(
-      model: config.modelId,
-      apiKey: const String.fromEnvironment('GEMINI_API_KEY'),
-    );
-    return geminiModel;
+    
+    if (config.isFirebaseAi) {
+      // Firebase AI モデル
+      try {
+        await FirebaseAiService.instance.initialize(
+          apiKey: const String.fromEnvironment('GEMINI_API_KEY'),
+        );
+        return FirebaseAiService.instance.createModel(config.modelId);
+      } catch (e) {
+        debugPrint('Firebase AI initialization failed: $e');
+        // フォールバックとして Google Generative AI を使用
+        return google_ai.GenerativeModel(
+          model: 'models/gemini-2.0-flash',
+          apiKey: const String.fromEnvironment('GEMINI_API_KEY'),
+        );
+      }
+    } else {
+      // Google Generative AI モデル
+      return google_ai.GenerativeModel(
+        model: config.modelId,
+        apiKey: const String.fromEnvironment('GEMINI_API_KEY'),
+      );
+    }
   }
 
   Future<void> _initializeMcpClient() async {
@@ -58,14 +80,28 @@ class _ChatScreenState extends State<ChatScreen> {
     });
 
     try {
-      final geminiModel = await prepareGemini();
+      final model = await prepareModel();
       _mcpManager = McpClientManager();
-      _bridge = GeminiMcpBridge(
-        mcpManager: _mcpManager, 
-        model: geminiModel,
-        onThinking: _handleThinking,
-      );
-      _bridge.clearHistory();
+      
+      // Firebase AI か Google Generative AI かでブリッジを選択
+      if (_currentModel.isFirebaseAi && model is firebase_ai.GenerativeModel) {
+        _firebaseBridge = FirebaseAiBridge(
+          mcpManager: _mcpManager,
+          model: model,
+          onThinking: _handleThinking,
+        );
+        _firebaseBridge!.clearHistory();
+        debugPrint('Using Firebase AI Bridge');
+      } else {
+        _bridge = GeminiMcpBridge(
+          mcpManager: _mcpManager, 
+          model: model as google_ai.GenerativeModel,
+          onThinking: _handleThinking,
+        );
+        _bridge.clearHistory();
+        debugPrint('Using Google Generative AI Bridge');
+      }
+      
       _messages.clear();
       
       // thinking状態をリセット
@@ -98,8 +134,7 @@ class _ChatScreenState extends State<ChatScreen> {
       });
       
       // 新しいモデルでブリッジを更新
-      final newGeminiModel = await prepareGemini(selectedModel);
-      _bridge.updateModel(newGeminiModel);
+      await _initializeMcpClient();
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -172,7 +207,9 @@ class _ChatScreenState extends State<ChatScreen> {
       //   return;
       // }
 
-      final response = await _bridge.chat(text);
+      final response = _currentModel.isFirebaseAi && _firebaseBridge != null
+          ? await _firebaseBridge!.chat(text)
+          : await _bridge.chat(text);
       
       // thinkingメッセージを削除して回答を追加
       _clearThinking();

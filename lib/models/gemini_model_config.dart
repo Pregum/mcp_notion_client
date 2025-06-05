@@ -1,9 +1,15 @@
+enum ModelProvider {
+  googleGenerativeAi,
+  firebaseAi,
+}
+
 class GeminiModelConfig {
   final String modelId;
   final String displayName;
   final String description;
   final bool supportsFunctionCalling;
   final bool isExperimental;
+  final ModelProvider provider;
 
   const GeminiModelConfig({
     required this.modelId,
@@ -11,9 +17,28 @@ class GeminiModelConfig {
     required this.description,
     this.supportsFunctionCalling = true,
     this.isExperimental = false,
+    this.provider = ModelProvider.googleGenerativeAi,
   });
 
   static const List<GeminiModelConfig> availableModels = [
+    // Firebase AI モデル
+    GeminiModelConfig(
+      modelId: 'gemini-2.0-flash-thinking-exp',
+      displayName: 'Gemini 2.0 Flash Thinking (Firebase)',
+      description: 'Firebase AI: 真のthinking情報対応実験版',
+      supportsFunctionCalling: true,
+      isExperimental: true,
+      provider: ModelProvider.firebaseAi,
+    ),
+    GeminiModelConfig(
+      modelId: 'gemini-2.0-flash-exp',
+      displayName: 'Gemini 2.0 Flash Exp (Firebase)',
+      description: 'Firebase AI: 最新機能テスト版',
+      supportsFunctionCalling: true,
+      isExperimental: true,
+      provider: ModelProvider.firebaseAi,
+    ),
+    // Google Generative AI モデル
     GeminiModelConfig(
       modelId: 'models/gemini-2.0-flash-thinking-exp',
       displayName: 'Gemini 2.0 Flash Thinking',
@@ -64,13 +89,17 @@ class GeminiModelConfig {
 
   static GeminiModelConfig get defaultModel => availableModels.first;
 
+  bool get isFirebaseAi => provider == ModelProvider.firebaseAi;
+  bool get isGoogleGenerativeAi => provider == ModelProvider.googleGenerativeAi;
+  
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is GeminiModelConfig &&
           runtimeType == other.runtimeType &&
-          modelId == other.modelId;
+          modelId == other.modelId &&
+          provider == other.provider;
 
   @override
-  int get hashCode => modelId.hashCode;
+  int get hashCode => Object.hash(modelId, provider);
 }

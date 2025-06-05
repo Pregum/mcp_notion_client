@@ -39,6 +39,9 @@ dependencies:
   mcp_client: ^0.1.7          # spec 2024-11-05 対応  [oai_citation:6‡GitHub](https://github.com/app-appplayer/mcp_client)
   # Gemini SDK (最新版に更新、将来的にFirebase統合版への移行を検討)
   google_generative_ai: ^0.4.7  # 最新版
+  # Firebase AI SDK (thinking機能調査用)
+  firebase_ai: ^2.0.0
+  firebase_core: ^3.8.0
   shared_preferences: ^2.2.0  # API keyの保存用
   http: ^1.1.0            # HTTPリクエスト用
   flutter_hooks: ^0.21.0

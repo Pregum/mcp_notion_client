@@ -105,6 +105,16 @@ class _ModelSelectorDialogState extends State<ModelSelectorDialog> {
                             materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             visualDensity: VisualDensity.compact,
                           ),
+                        Chip(
+                          label: Text(model.isFirebaseAi ? 'Firebase AI' : 'Google AI'),
+                          labelStyle: TextStyle(
+                            fontSize: 10,
+                            color: model.isFirebaseAi ? Colors.orange.shade700 : Colors.blue.shade700,
+                          ),
+                          backgroundColor: model.isFirebaseAi ? Colors.orange.shade50 : Colors.blue.shade50,
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          visualDensity: VisualDensity.compact,
+                        ),
                       ],
                     ),
                   ],
