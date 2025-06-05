@@ -75,6 +75,13 @@ class _ChatScreenState extends State<ChatScreen> {
     });
 
     try {
+      debugPrint('🚀 Initializing MCP client with model: ${_currentModel.displayName}');
+      debugPrint('🚀 Model details:');
+      debugPrint('  - Model ID: ${_currentModel.modelId}');
+      debugPrint('  - Provider: ${_currentModel.provider}');
+      debugPrint('  - Is Firebase AI: ${_currentModel.isFirebaseAi}');
+      debugPrint('  - Is Google Generative AI: ${_currentModel.isGoogleGenerativeAi}');
+      
       final model = await prepareModel();
       _mcpManager = McpClientManager();
       
@@ -124,6 +131,13 @@ class _ChatScreenState extends State<ChatScreen> {
     );
     
     if (selectedModel != null && selectedModel != _currentModel) {
+      debugPrint('🔄 Model changed from ${_currentModel.displayName} to ${selectedModel.displayName}');
+      debugPrint('🔄 New model details:');
+      debugPrint('  - Model ID: ${selectedModel.modelId}');
+      debugPrint('  - Provider: ${selectedModel.provider}');
+      debugPrint('  - Is experimental: ${selectedModel.isExperimental}');
+      debugPrint('  - Supports thinking (expected): ${selectedModel.modelId.contains('2.5')}');
+      
       setState(() {
         _currentModel = selectedModel;
       });
@@ -207,6 +221,7 @@ class _ChatScreenState extends State<ChatScreen> {
       // }
 
       // 思考情報付きレスポンスを取得
+      debugPrint('💭 Getting thinking response for model: ${_currentModel.displayName}');
       final thinkingResponse = _currentModel.isFirebaseAi && _firebaseBridge != null
           ? null // Firebase AIは現在思考情報をサポートしていない
           : await _bridge.chatWithThinking(text);
@@ -218,10 +233,20 @@ class _ChatScreenState extends State<ChatScreen> {
         // Google Generative AI (思考情報対応)
         responseText = thinkingResponse.text;
         thinkingContent = thinkingResponse.thoughts.isNotEmpty ? thinkingResponse.thoughts : null;
+        
+        debugPrint('💭 Thinking response received:');
+        debugPrint('  - Response text length: ${responseText.length}');
+        debugPrint('  - Thinking content length: ${thinkingResponse.thoughts.length}');
+        debugPrint('  - Has thinking content: ${thinkingContent != null}');
+        
+        if (thinkingContent != null) {
+          debugPrint('💭 Thinking preview: ${thinkingContent.substring(0, thinkingContent.length > 100 ? 100 : thinkingContent.length)}...');
+        }
       } else {
         // Firebase AI (通常の応答)
         responseText = await _firebaseBridge!.chat(text);
         thinkingContent = null;
+        debugPrint('💭 Firebase AI response (no thinking): ${responseText.length} chars');
       }
       
       // thinkingメッセージを削除して回答を追加
@@ -230,12 +255,14 @@ class _ChatScreenState extends State<ChatScreen> {
       setState(() {
         if (thinkingContent != null && thinkingContent.isNotEmpty) {
           // 思考情報付きメッセージ
+          debugPrint('💭 Adding message with thinking content');
           _messages.add(ChatMessage.withThoughts(
             text: responseText,
             actualThoughts: thinkingContent,
           ));
         } else {
           // 通常のメッセージ
+          debugPrint('💭 Adding regular message (no thinking)');
           _messages.add(ChatMessage(text: responseText, isUser: false));
         }
         _isLoading = false;

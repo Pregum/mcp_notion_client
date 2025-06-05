@@ -56,10 +56,21 @@ class GeminiMcpBridge {
         'Gemini Tools: ${geminiTools.map((e) => e.functionDeclarations?.firstOrNull?.name)}',
       );
 
-      // 3) モデルが思考機能をサポートしているかチェック（現在は無効化）
-      final supportsThinking = false; // Gemini 2.5の思考機能は今後対応予定
+      // 3) モデルが思考機能をサポートしているかチェック
+      // モデル名をデバッグで確認
+      final modelName = model.toString();
+      debugPrint('🔍 Current model: $modelName');
       
-      debugPrint('Supports thinking: $supportsThinking');
+      // Gemini 2.5モデルの判定（より詳細なチェック）
+      final supportsThinking = modelName.contains('2.5-flash') || 
+                             modelName.contains('2.5-pro') ||
+                             modelName.contains('gemini-2.5');
+      
+      debugPrint('🧠 Supports thinking: $supportsThinking');
+      debugPrint('🔍 Model string contains:');
+      debugPrint('  - "2.5-flash": ${modelName.contains('2.5-flash')}');
+      debugPrint('  - "2.5-pro": ${modelName.contains('2.5-pro')}'); 
+      debugPrint('  - "gemini-2.5": ${modelName.contains('gemini-2.5')}');
 
       // 4) LLM へ投げる（ユーザー発話）
       final userContent = gemini.Content.text(userPrompt);
@@ -307,43 +318,64 @@ class GeminiMcpBridge {
       );
       
       await for (final chunk in responseStream) {
-        if (chunk.candidates.isEmpty) continue;
+        if (chunk.candidates.isEmpty) {
+          debugPrint('🔍 Empty chunk received');
+          continue;
+        }
         
         final candidate = chunk.candidates.first;
+        debugPrint('🔍 Processing chunk with ${candidate.content.parts.length} parts');
         
         // Function callsの処理
         for (final call in chunk.functionCalls) {
           result.functionCalls.add(call);
+          debugPrint('🔧 Function call: ${call.name}');
         }
         
         // テキストコンテンツの処理
         for (final part in candidate.content.parts) {
           try {
             final partMap = part.toJson() as Map<String, dynamic>;
+            debugPrint('🔍 Part JSON: $partMap');
             
             // thought属性が存在するかチェック（Gemini 2.5での実装）
             if (supportsThinking && partMap.containsKey('thought') && partMap['thought'] == true) {
+              debugPrint('🧠 Found thinking part!');
               if (partMap.containsKey('text')) {
-                currentThoughts += partMap['text'] as String;
+                final thinkingText = partMap['text'] as String;
+                currentThoughts += thinkingText;
+                debugPrint('🧠 Thinking content (+${thinkingText.length} chars): ${thinkingText.substring(0, thinkingText.length > 100 ? 100 : thinkingText.length)}...');
+                
                 // 実際の思考情報が取得できた場合のみUIに通知
                 if (currentThoughts.isNotEmpty) {
+                  debugPrint('🧠 Notifying UI with thinking content');
                   _thinkingCallback?.call(ThinkingStep.planning, currentThoughts);
                 }
               }
             } else if (partMap.containsKey('text')) {
               // 通常のテキスト（回答）
-              currentAnswer += partMap['text'] as String;
+              final answerText = partMap['text'] as String;
+              currentAnswer += answerText;
+              debugPrint('💬 Answer content (+${answerText.length} chars): ${answerText.substring(0, answerText.length > 100 ? 100 : answerText.length)}...');
             }
             
-            // デバッグ出力
-            debugPrint('Part: $partMap');
+            // 思考機能が有効な場合の詳細ログ
+            if (supportsThinking) {
+              debugPrint('🔍 Part analysis:');
+              debugPrint('  - Has "thought" key: ${partMap.containsKey('thought')}');
+              debugPrint('  - "thought" value: ${partMap['thought']}');
+              debugPrint('  - Has "text" key: ${partMap.containsKey('text')}');
+              debugPrint('  - Keys: ${partMap.keys.toList()}');
+            }
+            
           } catch (e) {
             // JSON変換エラーの場合はテキストとして処理
             final text = part.toString();
             if (text.isNotEmpty) {
               currentAnswer += text;
+              debugPrint('📝 Fallback text (+${text.length} chars): ${text.substring(0, text.length > 100 ? 100 : text.length)}...');
             }
-            debugPrint('Part parsing error: $e');
+            debugPrint('❌ Part parsing error: $e');
           }
         }
       }
@@ -351,7 +383,19 @@ class GeminiMcpBridge {
       result.thoughts = currentThoughts;
       result.text = currentAnswer;
       
+      // 最終結果のデバッグ情報
+      debugPrint('🏁 Final results:');
+      debugPrint('  - Thoughts length: ${currentThoughts.length} chars');
+      debugPrint('  - Answer length: ${currentAnswer.length} chars');
+      debugPrint('  - Has thoughts: ${currentThoughts.isNotEmpty}');
+      debugPrint('  - Has answer: ${currentAnswer.isNotEmpty}');
+      
+      if (currentThoughts.isNotEmpty) {
+        debugPrint('🧠 Final thinking content preview: ${currentThoughts.substring(0, currentThoughts.length > 200 ? 200 : currentThoughts.length)}...');
+      }
+      
       if (currentThoughts.isNotEmpty || currentAnswer.isNotEmpty) {
+        debugPrint('🏁 Notifying completion');
         _notifyThinking(ThinkingStep.completed, '完了しました');
       }
       
