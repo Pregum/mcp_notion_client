@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import '../models/chat_message.dart';
-import '../services/step2_local_tools.dart';
+import '../services/local_tools.dart';
 
-class Step2ChatScreen extends StatefulWidget {
-  const Step2ChatScreen({super.key});
+class ChatScreen extends StatefulWidget {
+  const ChatScreen({super.key});
 
   @override
-  State<Step2ChatScreen> createState() => _Step2ChatScreenState();
+  State<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _Step2ChatScreenState extends State<Step2ChatScreen> {
+class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _textController = TextEditingController();
   final List<ChatMessage> _messages = [];
   bool _isLoading = false;
@@ -34,7 +34,7 @@ class _Step2ChatScreenState extends State<Step2ChatScreen> {
       _model = GenerativeModel(
         model: 'models/gemini-2.0-flash',
         apiKey: const String.fromEnvironment('GEMINI_API_KEY'),
-        tools: Step2LocalTools.tools,
+        tools: LocalTools.tools,
       );
       
       // 初期メッセージを追加
@@ -77,7 +77,7 @@ class _Step2ChatScreenState extends State<Step2ChatScreen> {
       
       // Function call があるかチェック
       if (response.functionCalls.isNotEmpty) {
-        await _handleFunctionCalls(response.functionCalls);
+        await _handleFunctionCalls(response.functionCalls.toList());
       } else {
         final responseText = response.text ?? 'レスポンスを生成できませんでした。';
         _chatHistory.add(Content.text(responseText));
@@ -108,7 +108,7 @@ class _Step2ChatScreenState extends State<Step2ChatScreen> {
 
     for (final call in functionCalls) {
       try {
-        final result = await Step2LocalTools.executeTool(call.name, call.args);
+        final result = await LocalTools.executeTool(call.name, call.args);
         responses.add(FunctionResponse(call.name, {'result': result}));
         
         // ツール実行結果をチャットに表示
@@ -155,7 +155,7 @@ class _Step2ChatScreenState extends State<Step2ChatScreen> {
   }
 
   void _showToolList() {
-    final tools = Step2LocalTools.getToolList();
+    final tools = LocalTools.getToolList();
     
     showDialog(
       context: context,
@@ -261,7 +261,7 @@ class _Step2ChatScreenState extends State<Step2ChatScreen> {
         }
       }
 
-      final result = await Step2LocalTools.executeTool(toolName, args);
+      final result = await LocalTools.executeTool(toolName, args);
       
       setState(() {
         _messages.add(ChatMessage(

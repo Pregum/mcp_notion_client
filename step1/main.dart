@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:mcp_notion_client/screens/step1_chat_screen.dart';
+import 'lib/screens/chat_screen.dart';
 
 Future<void> main() async {
   runApp(const Step1App());
@@ -16,7 +16,7 @@ class Step1App extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         useMaterial3: true,
       ),
-      home: const Step1ChatScreen(),
+      home: const ChatScreen(),
     );
   }
 }

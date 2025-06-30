@@ -56,69 +56,57 @@ Notionのページ操作をする際にpage idが必要になることがある�
 
 ## プロジェクト構成
 
-### lib/ディレクトリ構成
+### ディレクトリ構成
 
 ```
-lib/
-├── main.dart                           # アプリケーションのエントリーポイント
-├── screens/
-│   └── chat_screen.dart               # メイン画面（チャットUI）
-├── services/
-│   ├── gemini_mcp_bridge.dart         # Gemini AIとMCPサーバーを繋ぐ橋渡し役
-│   └── mcp_client_manager.dart        # MCPクライアントの管理
-├── models/
-│   ├── chat_message.dart              # チャットメッセージのデータモデル
-│   └── mcp_server_status.dart         # MCPサーバーの状態管理
-└── components/
-    ├── add_server_dialog.dart         # サーバー追加ダイアログ
-    └── server_status_panel.dart       #接続状態表示パネル
+├── step1/                              # Step 1: Flutter x Gemini 基本接続
+│   ├── main.dart                       # エントリーポイント
+│   └── lib/
+│       ├── models/
+│       │   └── chat_message.dart       # チャットメッセージUI
+│       └── screens/
+│           └── chat_screen.dart        # 基本チャット画面
+├── step2/                              # Step 2: Flutter x Gemini x ローカルツール
+│   ├── main.dart                       # エントリーポイント
+│   └── lib/
+│       ├── models/
+│       │   └── chat_message.dart       # チャットメッセージUI
+│       ├── services/
+│       │   └── local_tools.dart        # ローカルツール実装
+│       └── screens/
+│           └── chat_screen.dart        # Function Calling対応チャット画面
+└── step3/                              # Step 3: Flutter x Gemini x MCP (完全版)
+    ├── main.dart                       # エントリーポイント
+    └── lib/
+        ├── components/
+        │   ├── add_server_dialog.dart   # サーバー追加ダイアログ
+        │   └── server_status_panel.dart # サーバー状態表示パネル
+        ├── models/
+        │   ├── chat_message.dart        # チャットメッセージUI
+        │   └── mcp_server_status.dart   # MCPサーバー状態管理
+        ├── screens/
+        │   └── chat_screen.dart         # MCP統合チャット画面
+        └── services/
+            ├── gemini_mcp_bridge.dart   # Gemini-MCP橋渡し
+            └── mcp_client_manager.dart  # MCPクライアント管理
 ```
 
-### 各ファイルの役割
+### 各ステップの特徴
 
-#### main.dart
-- Flutter アプリケーションのエントリーポイント
-- MaterialApp の設定とChatScreenの起動
-- アプリ全体のテーマ設定
+#### Step 1: 基本接続
+- **目的**: Gemini APIとの基本的な接続方法を学習
+- **機能**: シンプルなチャット機能のみ
+- **学習ポイント**: API認証、基本的なリクエスト/レスポンス処理
 
-#### screens/chat_screen.dart
-- メインのチャット画面UI
-- ユーザーとの対話インターフェース
-- MCPサーバーの接続状態表示
-- サーバー追加・削除機能
+#### Step 2: ローカルツール
+- **目的**: Function Callingの仕組みを理解
+- **機能**: 3つのローカルツール（挨拶、計算、Web検索モック）
+- **学習ポイント**: ツール定義、手動実行、AI自動選択
 
-#### services/gemini_mcp_bridge.dart
-- Gemini AIとMCPサーバー間の通信を仲介
-- MCP ツール定義をGemini用に変換
-- チャット履歴の管理
-- Function Calling フローの制御
-- エラーハンドリング（認証エラー、レート制限など）
-
-#### services/mcp_client_manager.dart
-- 複数のMCPサーバーへの接続管理
-- デフォルトサーバー（Notion、Spotify）の初期化
-- サーバーの動的追加・削除機能
-- 接続タイムアウト処理
-
-#### models/chat_message.dart
-- チャットメッセージの表示コンポーネント
-- ユーザー/AI の発言を区別して表示
-- メッセージのスタイリング
-
-#### models/mcp_server_status.dart
-- MCPサーバーの接続状態を表すデータモデル
-- サーバー名、URL、ヘッダー、接続状態、エラー情報を管理
-
-#### components/add_server_dialog.dart
-- 新しいMCPサーバーを追加するためのダイアログ
-- サーバータイプのテンプレート機能
-- URL・認証情報の入力フォーム
-
-#### components/server_status_panel.dart
-- MCPサーバーの接続状態を表示するパネル
-- 接続中サーバー数の表示
-- サーバーの削除機能
-- パネルの展開・収納機能
+#### Step 3: MCP統合
+- **目的**: 実用的なMCPサーバー連携を実装
+- **機能**: Notion/Spotify等の外部サービス統合
+- **学習ポイント**: 複数サーバー管理、認証、エラーハンドリング
 
 ## 段階的学習ステップ
 
@@ -127,7 +115,8 @@ lib/
 ### Step 1: Flutter x Gemini 基本接続
 
 ```bash
-flutter run -t step1_main.dart
+cd step1
+flutter run
 ```
 
 **学習内容:**
@@ -144,7 +133,8 @@ flutter run -t step1_main.dart
 ### Step 2: Flutter x Gemini x ローカルツール
 
 ```bash
-flutter run -t step2_main.dart
+cd step2
+flutter run
 ```
 
 **学習内容:**
@@ -167,7 +157,8 @@ flutter run -t step2_main.dart
 ### Step 3: Flutter x Gemini x MCP (完全版)
 
 ```bash
-flutter run  # または flutter run -t main.dart
+cd step3
+flutter run
 ```
 
 **学習内容:**
