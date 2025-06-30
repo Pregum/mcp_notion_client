@@ -111,10 +111,10 @@ class _ChatScreenState extends State<ChatScreen> {
         final result = await LocalTools.executeTool(call.name, call.args);
         responses.add(FunctionResponse(call.name, {'result': result}));
         
-        // ツール実行結果をチャットに表示
+        // ツール実行を表示（結果は含めない）
         setState(() {
           _messages.add(ChatMessage(
-            text: '🔧 ツール実行: ${call.name}\n結果: $result',
+            text: '🔧 ツール実行: ${call.name}',
             isUser: false,
           ));
         });
@@ -129,12 +129,13 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     }
 
+    // Function call とその応答をチャット履歴に正しく記録
+    _chatHistory.add(Content.model(functionCalls));
+    _chatHistory.add(Content.functionResponses(responses));
+
     // Function call の結果を含めて再度 Gemini に送信
     try {
-      final followUpResponse = await _model.generateContent([
-        ..._chatHistory,
-        Content.functionResponses(responses),
-      ]);
+      final followUpResponse = await _model.generateContent(_chatHistory);
 
       final responseText = followUpResponse.text ?? 'フォローアップレスポンスを生成できませんでした。';
       _chatHistory.add(Content.text(responseText));
