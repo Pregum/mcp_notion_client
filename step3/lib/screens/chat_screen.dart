@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
-import 'package:mcp_notion_client/models/mcp_server_status.dart';
+import '../models/mcp_server_status.dart';
 import '../services/gemini_mcp_bridge.dart';
 import '../models/chat_message.dart';
 import '../components/server_status_panel.dart';

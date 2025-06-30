@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:mcp_notion_client/models/mcp_server_status.dart';
+import '../models/mcp_server_status.dart';
 
 class ServerStatusPanel extends StatefulWidget {
   final List<McpServerStatus> serverStatuses;
