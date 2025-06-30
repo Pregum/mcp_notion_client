@@ -120,6 +120,76 @@ lib/
 - サーバーの削除機能
 - パネルの展開・収納機能
 
+## 段階的学習ステップ
+
+このプロジェクトには、LLM統合を段階的に学習するための3つのステップが用意されています：
+
+### Step 1: Flutter x Gemini 基本接続
+
+```bash
+flutter run -t step1_main.dart
+```
+
+**学習内容:**
+- Flutter から Gemini API への基本的な接続
+- シンプルなチャット機能の実装
+- API キーの設定と認証
+- ツール機能は未実装（確認用ボタンあり）
+
+**特徴:**
+- 最小限のコード構成
+- Gemini との対話のみ
+- エラーハンドリングの基本
+
+### Step 2: Flutter x Gemini x ローカルツール
+
+```bash
+flutter run -t step2_main.dart
+```
+
+**学習内容:**
+- Function Calling の実装
+- ローカルツールの定義と実行
+- ツールの手動実行とAI自動選択
+- ツール実行結果の処理
+
+**実装されているツール:**
+1. **hello_gemini**: Gemini への挨拶ツール
+2. **calculate**: 2つの整数の計算ツール
+3. **web_search**: Web検索のモック実装
+
+**特徴:**
+- ツール一覧表示機能
+- 手動ツール実行ダイアログ
+- AI による自動ツール選択
+- 実行結果の可視化
+
+### Step 3: Flutter x Gemini x MCP (完全版)
+
+```bash
+flutter run  # または flutter run -t main.dart
+```
+
+**学習内容:**
+- MCP (Model Context Protocol) サーバーとの接続
+- 複数のMCPクライアント管理
+- 動的なサーバー追加・削除
+- 外部サービス（Notion、Spotify）との統合
+
+**特徴:**
+- 本格的なMCPサーバー連携
+- サーバー状態管理
+- 認証とエラーハンドリング
+- 実用的なツール群
+
+## 推奨学習順序
+
+1. **Step 1** でGemini APIとの基本接続を理解
+2. **Step 2** でFunction Callingとローカルツールを体験
+3. **Step 3** でMCPサーバーとの本格連携を学習
+
+各ステップは独立して動作し、段階的に複雑さが増していきます。
+
 ## データフロー図
 
 ```mermaid
