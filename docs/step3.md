@@ -2,7 +2,12 @@
 
 ## 概要
 
-Step 3では、MCP (Model Context Protocol) サーバーとの実用的な統合を学習します。Notion や Spotify などの外部サービスと連携し、複数のMCPサーバーを管理する本格的なアプリケーションを実装します。
+Step 3では、Step 2のローカルツールを拡張して、MCP (Model Context Protocol) サーバーとの実用的な統合を学習します。Step 2のコードベースをベースに、外部サービス（Notion、Spotify等）との連携機能を追加し、複数のMCPサーバーを管理する本格的なアプリケーションを実装します。
+
+**Step 2からの主な拡張点:**
+- ローカルツール → 外部MCPサーバーのツール
+- 固定ツール → 動的ツール取得
+- シンプルなUI → サーバー管理UI追加
 
 ## 実行方法
 
@@ -24,10 +29,9 @@ step3/
     │   ├── chat_message.dart          # チャットメッセージUI コンポーネント
     │   └── mcp_server_status.dart     # MCPサーバー状態管理
     ├── screens/
-    │   └── chat_screen.dart           # MCP統合チャット画面
+    │   └── chat_screen.dart           # MCP統合チャット画面（Step 2ベース）
     └── services/
-        ├── gemini_mcp_bridge.dart     # Gemini-MCP橋渡し
-        └── mcp_client_manager.dart    # MCPクライアント管理
+        └── mcp_tools.dart             # MCPツール管理（Step 2のlocal_tools.dartの拡張版）
 ```
 
 ## 各ファイルの役割
@@ -216,47 +220,155 @@ for (final clientInfo in _mcpManager.connectedClients) {
 - レート制限の処理
 - 分かりやすいエラーメッセージの生成
 
-### lib/screens/chat_screen.dart
+### lib/services/mcp_tools.dart
 
-**役割**: MCP統合対応のメインチャット画面
+**役割**: MCPツール管理（Step 2の `local_tools.dart` を拡張）
 
-**Step 2 からの主要な追加・変更点**:
+**Step 2からの主要な変更点**:
 
-#### 1. MCP統合の初期化
+#### 1. ローカルツール → MCPサーバーのツール
 ```dart
-Future<void> _initializeMcpClient() async {
-  try {
-    final geminiModel = await prepareGemini();
-    _mcpManager = McpClientManager();
-    _bridge = GeminiMcpBridge(mcpManager: _mcpManager, model: geminiModel);
-    
-    // 各サーバーに接続を試みる
-    for (final status in _mcpManager.serverStatuses) {
-      await _mcpManager.connectToServer(status);
-    }
-  } finally {
-    if (mounted) {
-      setState(() {
-        _isInitializing = false;
-      });
-    }
+// Step 2: 固定のローカルツール
+static List<Tool> get tools => [
+  // 事前定義された3つのツール
+];
+
+// Step 3: 動的なMCPサーバーのツール
+Future<List<Tool>> getAvailableTools() async {
+  final allTools = <mcp_client.Tool>[];
+  
+  // 接続されている全てのMCPクライアントからツール定義を取得
+  for (final clientInfo in _clients) {
+    final tools = await clientInfo.client.listTools();
+    allTools.addAll(tools);
+  }
+  
+  return _toGeminiTools(allTools);
+}
+```
+
+#### 2. ツール実行の拡張
+```dart
+// Step 2: シンプルなローカル実行
+static Future<String> executeTool(String toolName, Map<String, dynamic> args) async {
+  switch (toolName) {
+    case 'hello_gemini': return _executeHelloGemini();
+    // ...
   }
 }
-```
 
-#### 2. MCP Bridge を使用したチャット処理
-```dart
-void _handleSubmitted(String text) async {
-  // MCPブリッジ経由でチャット処理
-  final response = await _bridge.chat(text);
-  setState(() {
-    _messages.add(ChatMessage(text: response, isUser: false));
-    _isLoading = false;
-  });
+// Step 3: MCPサーバーでの実行
+Future<String> executeTool(String toolName, Map<String, dynamic> args) async {
+  // 適切なMCPクライアントを探してツールを実行
+  for (final clientInfo in _clients) {
+    final tools = await clientInfo.client.listTools();
+    if (tools.any((tool) => tool.name == toolName)) {
+      final toolResult = await clientInfo.client.callTool(toolName, args);
+      return _formatToolResult(toolResult.content);
+    }
+  }
+  throw Exception('Tool not found in any connected MCP server');
 }
 ```
 
-#### 3. サーバー管理UI
+#### 3. MCPサーバー管理機能
+```dart
+// MCPサーバーへの接続
+Future<void> connectToServer(McpServerStatus status) async {
+  final client = mcp_client.McpClient.createClient(/*...*/);
+  final transport = await mcp_client.McpClient.createSseTransport(/*...*/);
+  await client.connect(transport);
+  _clients.add(McpClientInfo(/*...*/));
+}
+
+// サーバーの動的追加・削除
+Future<void> addServer(McpServerStatus serverStatus) async { /*...*/ }
+Future<void> removeServer(String name) async { /*...*/ }
+```
+
+#### 4. エラーハンドリングの強化
+```dart
+String _handleServiceError(Map<String, dynamic> errorJson) {
+  switch (errorJson['service']) {
+    case 'notion':
+      if (errorJson['code'] == 'unauthorized') {
+        return 'NotionのAPIトークンが無効です。有効なAPIトークンを設定してください。';
+      }
+      break;
+    case 'spotify':
+      if (errorJson['code'] == 'unauthorized') {
+        return 'Spotifyのアクセストークンが無効です。再認証が必要です。';
+      }
+      break;
+  }
+  return 'エラーが発生しました: ${errorJson['message']}';
+}
+```
+
+### lib/screens/chat_screen.dart
+
+**役割**: MCP統合対応のメインチャット画面（Step 2ベース）
+
+**Step 2からの主要な変更点**:
+
+#### 1. ローカルツール → MCPツールの初期化
+```dart
+// Step 2: 固定のローカルツール初期化
+_model = GenerativeModel(
+  model: 'models/gemini-2.0-flash',
+  apiKey: const String.fromEnvironment('GEMINI_API_KEY'),
+  tools: LocalTools.tools,  // 固定のツール
+);
+
+// Step 3: 動的なMCPツール初期化
+Future<void> _initializeGeminiAndMcp() async {
+  // MCP Tools の初期化
+  _mcpTools = McpTools();
+  
+  // 各サーバーに接続を試みる
+  for (final status in _mcpTools.serverStatuses) {
+    await _mcpTools.connectToServer(status);
+  }
+
+  // Gemini モデルの初期化（ツールは動的に取得）
+  _model = GenerativeModel(
+    model: 'models/gemini-2.0-flash',
+    apiKey: const String.fromEnvironment('GEMINI_API_KEY'),
+    // ツールは実行時に動的に設定
+  );
+}
+```
+
+#### 2. 動的ツール取得とチャット処理
+```dart
+// Step 2: 固定ツールでの処理
+final response = await _model.generateContent(_chatHistory);
+
+// Step 3: 動的ツール取得での処理
+void _handleSubmitted(String text) async {
+  final userContent = Content.text(text);
+  _chatHistory.add(userContent);
+
+  // 利用可能なMCPツールを動的に取得してGeminiに設定
+  final availableTools = await _mcpTools.getAvailableTools();
+  
+  final response = await _model.generateContent(
+    _chatHistory,
+    tools: availableTools,  // 動的に取得したツール
+  );
+}
+```
+
+#### 3. ツール実行の変更
+```dart
+// Step 2: ローカルツール実行
+final result = await LocalTools.executeTool(call.name, call.args);
+
+// Step 3: MCPツール実行
+final result = await _mcpTools.executeTool(call.name, call.args);
+```
+
+#### 4. サーバー管理UI の追加
 - `ServerStatusPanel` の統合
 - サーバー追加・削除機能
 - 接続状態のリアルタイム表示
@@ -328,31 +440,31 @@ final Map<String, Map<String, String>> _serverTemplates = {
 
 ## 学習のポイント
 
-### 1. MCP (Model Context Protocol)
+### 1. Step 2からの段階的拡張
+- **ローカルツール → 外部MCPサーバー**: 同じFunction Callingの仕組みを使用
+- **固定ツール → 動的ツール**: 実行時にサーバーからツール一覧を取得
+- **シンプルUI → 管理UI**: サーバー状態の可視化と管理機能
+
+### 2. MCP (Model Context Protocol)
 - MCP の基本概念と仕組み
 - SSE (Server-Sent Events) による通信
 - 複数サーバーの管理方法
 
-### 2. 外部サービス統合
+### 3. アーキテクチャの拡張性
+- Step 2の `LocalTools` → Step 3の `McpTools`
+- 同じインターフェースでローカル/外部ツールを統一的に扱う
+- Function Calling のフローは Step 2 と全く同じ
+
+### 4. 外部サービス統合
 - Notion API との連携
 - Spotify API との連携
 - 認証の管理（API Key, Access Token）
 
-### 3. エラーハンドリング
+### 5. エラーハンドリングの進歩
 - 接続タイムアウトの処理
 - 認証エラーの検出
 - レート制限への対応
-- ユーザーフレンドリーなエラーメッセージ
-
-### 4. 状態管理
-- 複数サーバーの状態管理
-- UI の動的更新
-- 非同期処理の制御
-
-### 5. ユーザビリティ
-- サーバー管理の UI/UX
-- リアルタイムステータス表示
-- 直感的な操作性
+- サービス別のエラーメッセージ
 
 ## 実用例
 
