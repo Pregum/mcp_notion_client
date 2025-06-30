@@ -6,10 +6,24 @@
   "configurations": [
   
     {
-      "name": "mcp_notion_client",
+      "name": "step1",
       "request": "launch",
       "type": "dart",
-      "program": "lib/main.dart",
+      "program": "step1/main.dart",
+      "args": ["--dart-define-from-file=.env"]
+    },
+    {
+      "name": "step2",
+      "request": "launch",
+      "type": "dart",
+      "program": "step2/main.dart",
+      "args": ["--dart-define-from-file=.env"]
+    },
+    {
+      "name": "step3",
+      "request": "launch",
+      "type": "dart",
+      "program": "step3/main.dart",
       "args": ["--dart-define-from-file=.env"]
     }
   ]
