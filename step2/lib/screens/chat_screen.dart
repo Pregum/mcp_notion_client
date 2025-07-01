@@ -196,7 +196,7 @@ class _ChatScreenState extends State<ChatScreen> {
     Navigator.of(context).pop(); // ツール一覧ダイアログを閉じる
     
     final Map<String, TextEditingController> controllers = {};
-    final parameters = tool['parameters'] as Map<String, dynamic>;
+    final parameters = tool['parameters'] as Map<dynamic, dynamic>;
     
     for (final param in parameters.entries) {
       controllers[param.key] = TextEditingController();
