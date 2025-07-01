@@ -208,24 +208,26 @@ class _ChatScreenState extends State<ChatScreen> {
         title: Text('${tool['name']} を実行'),
         content: parameters.isEmpty
             ? const Text('このツールにはパラメーターがありません。')
-            : Column(
-                mainAxisSize: MainAxisSize.min,
-                children: parameters.entries.map((param) {
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 8.0),
-                    child: TextField(
-                      controller: controllers[param.key],
-                      decoration: InputDecoration(
-                        labelText: param.key,
-                        hintText: param.value['description'],
+            : SingleChildScrollView(
+              child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: parameters.entries.map((param) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8.0),
+                      child: TextField(
+                        controller: controllers[param.key],
+                        decoration: InputDecoration(
+                          labelText: param.key,
+                          hintText: param.value['description'],
+                        ),
+                        keyboardType: param.value['type'] == 'integer'
+                            ? TextInputType.number
+                            : TextInputType.text,
                       ),
-                      keyboardType: param.value['type'] == 'integer'
-                          ? TextInputType.number
-                          : TextInputType.text,
-                    ),
-                  );
-                }).toList(),
-              ),
+                    );
+                  }).toList(),
+                ),
+            ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
@@ -233,8 +235,15 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
+              final Map<String, String> args = {};
+              for (final entry in controllers.entries) {
+                args[entry.key] = entry.value.text;
+                // コントローラーを破棄すると、レイアウトエラーが発生するため、破棄しない
+                // entry.value.dispose();
+              }
+
               Navigator.of(context).pop();
-              await _executeToolManually(tool['name'], controllers);
+              await _executeToolManually(tool['name'], args);
             },
             child: const Text('実行'),
           ),
@@ -243,7 +252,7 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Future<void> _executeToolManually(String toolName, Map<String, TextEditingController> controllers) async {
+  Future<void> _executeToolManually(String toolName, Map<String, String> controllers) async {
     setState(() {
       _isLoading = true;
     });
@@ -251,7 +260,7 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       final Map<String, dynamic> args = {};
       for (final entry in controllers.entries) {
-        final value = entry.value.text;
+        final value = entry.value;
         if (value.isNotEmpty) {
           // 型変換を試行
           if (toolName == 'calculate' && (entry.key == 'a' || entry.key == 'b')) {
@@ -272,10 +281,6 @@ class _ChatScreenState extends State<ChatScreen> {
         _isLoading = false;
       });
 
-      // コントローラーを破棄
-      for (final controller in controllers.values) {
-        controller.dispose();
-      }
     } catch (e) {
       setState(() {
         _messages.add(ChatMessage(
