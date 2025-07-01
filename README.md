@@ -8,6 +8,9 @@ sse接続するサーバーは、ローカルPC上に立ててアプリはそこ
 詳細はこちらの方の記事がわかりやすかったです。
 <https://notai.jp/supergateway/>
 
+このプロジェクトは学習用に3つのステップ（step1〜3）に分かれており、段階的にLLM統合を学べる構成になっています。
+また、ルートレベルの`lib/`ディレクトリにはstep3と同じ完全版の実装が含まれており、`flutter run`でメインアプリケーションとして実行できます。
+
 ## 事前準備
 
 事前に以下のアカウントが必要です
@@ -59,6 +62,23 @@ Notionのページ操作をする際にpage idが必要になることがある�
 ### ディレクトリ構成
 
 ```
+├── lib/                                # メインアプリケーション (step3と同じ構成)
+│   ├── components/
+│   │   ├── add_server_dialog.dart      # サーバー追加ダイアログ
+│   │   └── server_status_panel.dart    # サーバー状態表示パネル
+│   ├── models/
+│   │   ├── chat_message.dart           # チャットメッセージUI
+│   │   └── mcp_server_status.dart      # MCPサーバー状態管理
+│   ├── screens/
+│   │   └── chat_screen.dart            # MCP統合チャット画面
+│   └── services/
+│       ├── gemini_mcp_bridge.dart      # Gemini-MCP橋渡し
+│       └── mcp_client_manager.dart     # MCPクライアント管理
+├── docs/                               # ドキュメント
+│   ├── README.md                       # ドキュメント一覧
+│   ├── step1.md                        # Step 1の詳細説明
+│   ├── step2.md                        # Step 2の詳細説明
+│   └── step3.md                        # Step 3の詳細説明
 ├── step1/                              # Step 1: Flutter x Gemini 基本接続
 │   ├── main.dart                       # エントリーポイント
 │   └── lib/
@@ -85,10 +105,14 @@ Notionのページ操作をする際にpage idが必要になることがある�
         │   ├── chat_message.dart        # チャットメッセージUI
         │   └── mcp_server_status.dart   # MCPサーバー状態管理
         ├── screens/
-        │   └── chat_screen.dart         # MCP統合チャット画面
+        │   ├── chat_screen.dart         # MCP統合チャット画面
+        │   ├── step1_chat_screen.dart   # Step 1画面の統合版
+        │   └── step2_chat_screen.dart   # Step 2画面の統合版
         └── services/
             ├── gemini_mcp_bridge.dart   # Gemini-MCP橋渡し
-            └── mcp_client_manager.dart  # MCPクライアント管理
+            ├── mcp_client_manager.dart  # MCPクライアント管理
+            ├── mcp_tools.dart           # MCPツール管理
+            └── step2_local_tools.dart   # Step 2のローカルツール
 ```
 
 ### 各ステップの特徴
@@ -166,12 +190,20 @@ flutter run
 - 複数のMCPクライアント管理
 - 動的なサーバー追加・削除
 - 外部サービス（Notion、Spotify）との統合
+- Step 1, 2の機能も統合された完全版
 
 **特徴:**
 - 本格的なMCPサーバー連携
 - サーバー状態管理
 - 認証とエラーハンドリング
 - 実用的なツール群
+- Step 1, 2の画面も含む統合版として実装
+
+**追加ファイル:**
+- **step1_chat_screen.dart**: Step 1の機能をStep 3内で利用可能にした画面
+- **step2_chat_screen.dart**: Step 2の機能をStep 3内で利用可能にした画面
+- **mcp_tools.dart**: MCPツールの管理とGemini形式への変換
+- **step2_local_tools.dart**: Step 2のローカルツールをStep 3で再利用
 
 ## 推奨学習順序
 
@@ -180,6 +212,15 @@ flutter run
 3. **Step 3** でMCPサーバーとの本格連携を学習
 
 各ステップは独立して動作し、段階的に複雑さが増していきます。
+
+## 詳細ドキュメント
+
+各ステップの詳細なファイル構成と実装内容については、`docs/`ディレクトリ内のドキュメントを参照してください：
+
+- [docs/README.md](docs/README.md) - ドキュメント一覧と学習の流れ
+- [docs/step1.md](docs/step1.md) - Step 1の詳細な実装解説
+- [docs/step2.md](docs/step2.md) - Step 2の詳細な実装解説
+- [docs/step3.md](docs/step3.md) - Step 3の詳細な実装解説
 
 ## データフロー図
 
