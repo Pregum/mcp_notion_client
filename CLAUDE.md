@@ -92,3 +92,7 @@ npx -y supergateway --stdio "npx -y @notionhq/notion-mcp-server"
 - `lib/components/` - Reusable UI components
 - `lib/screens/` - Top-level screen widgets
 - Error handling focuses on connection failures and API authentication issues
+
+## Coding Guidelines
+
+- Always japanese

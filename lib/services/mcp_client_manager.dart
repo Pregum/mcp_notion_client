@@ -23,6 +23,11 @@ class McpClientManager {
         url: 'http://${const String.fromEnvironment('SERVER_IP')}:8001/sse',
         headers: {},
       ),
+      McpServerStatus(
+        name: 'Mobile MCP',
+        url: 'http://${const String.fromEnvironment('SERVER_IP')}:8002/sse',
+        headers: {},
+      ),
     ]);
   }
 
@@ -149,6 +154,8 @@ class McpClientManager {
           'Authorization':
               'Bearer ${const String.fromEnvironment('SPOTIFY_ACCESS_TOKEN')}',
         };
+      case 'Mobile MCP':
+        return {};
       default:
         return {};
     }
