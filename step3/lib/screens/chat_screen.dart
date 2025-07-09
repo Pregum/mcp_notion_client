@@ -18,6 +18,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final List<ChatMessage> _messages = [];
   bool _isLoading = false;
   bool _isInitializing = true;
+  bool _showStepHeader = true; // Step 3ヘッダーの表示状態
   final ScrollController _scrollController = ScrollController();
   late GenerativeModel _model;
   late McpTools _mcpTools;
@@ -442,34 +443,56 @@ class _ChatScreenState extends State<ChatScreen> {
           child: Column(
             children: [
               // ステップ情報パネル
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16.0),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primaryContainer,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Step 3: Flutter x Gemini x MCP (完全版)',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.onPrimaryContainer,
+              if (_showStepHeader)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16.0),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primaryContainer,
+                  ),
+                  child: Stack(
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Step 3: Flutter x Gemini x MCP (完全版)',
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).colorScheme.onPrimaryContainer,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '• 外部MCPサーバー（Notion、Spotify等）との連携\n'
+                            '• 複数サーバーの動的管理と状態監視\n'
+                            '• Step 2の拡張版として実装',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: Theme.of(context).colorScheme.onPrimaryContainer,
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '• 外部MCPサーバー（Notion、Spotify等）との連携\n'
-                      '• 複数サーバーの動的管理と状態監視\n'
-                      '• Step 2の拡張版として実装',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onPrimaryContainer,
+                      Positioned(
+                        top: 0,
+                        right: 0,
+                        child: IconButton(
+                          icon: Icon(
+                            Icons.close,
+                            color: Theme.of(context).colorScheme.onPrimaryContainer,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _showStepHeader = false;
+                            });
+                          },
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
               
               // サーバー状態パネル
               ServerStatusPanel(
