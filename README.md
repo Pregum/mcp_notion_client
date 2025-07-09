@@ -48,6 +48,28 @@ OPENAPI_MCP_HEADERS='{"Authorization":"Bearer ntn_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 npx -y supergateway --port 8000 --stdio "npx -y @notionhq/notion-mcp-server"
 ```
 
+#### Spotify MCP (ポート8001)
+
+[spotify-mcp-server](https://github.com/marcelmarais/spotify-mcp-server)を使用してSpotifyの操作が可能です。
+
+```shell
+# リポジトリをクローン
+git clone https://github.com/marcelmarais/spotify-mcp-server.git
+cd spotify-mcp-server
+
+# 依存関係のインストール
+npm install
+
+# Spotify認証（ブラウザが開きます）
+npm run auth
+
+# ビルド
+npm run build
+
+# サーバー起動
+npx -y supergateway --port 8001 --stdio "node build/index.js"
+```
+
 #### Mobile MCP (ポート8002)
 
 ```shell
