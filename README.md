@@ -39,11 +39,19 @@ SERVER_IP=xxx.xxx.xx.xx
 
 ### 実際に叩いた時のローカルサーバのコマンド
 
-supergatewayを使用してNotion MCPサーバーをローカルPC上で立ち上げた時のコマンドです。
+supergatewayを使用して各MCPサーバーをローカルPC上で立ち上げた時のコマンドです。
+
+#### Notion MCP (ポート8000)
 
 ```shell
 OPENAPI_MCP_HEADERS='{"Authorization":"Bearer ntn_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx","Notion-Version":"2022-06-28"}' \
-npx -y supergateway --stdio "npx -y @notionhq/notion-mcp-server"
+npx -y supergateway --port 8000 --stdio "npx -y @notionhq/notion-mcp-server"
+```
+
+#### Mobile MCP (ポート8002)
+
+```shell
+npx -y supergateway --port 8002 --stdio "npx -y @mobilenext/mobile-mcp@0.0.19"
 ```
 
 notionのtokenは
@@ -118,16 +126,19 @@ Notionのページ操作をする際にpage idが必要になることがある�
 ### 各ステップの特徴
 
 #### Step 1: 基本接続
+
 - **目的**: Gemini APIとの基本的な接続方法を学習
 - **機能**: シンプルなチャット機能のみ
 - **学習ポイント**: API認証、基本的なリクエスト/レスポンス処理
 
 #### Step 2: ローカルツール
+
 - **目的**: Function Callingの仕組みを理解
 - **機能**: 3つのローカルツール（挨拶、計算、Web検索モック）
 - **学習ポイント**: ツール定義、手動実行、AI自動選択
 
 #### Step 3: MCP統合
+
 - **目的**: 実用的なMCPサーバー連携を実装
 - **機能**: Notion/Spotify等の外部サービス統合
 - **学習ポイント**: 複数サーバー管理、認証、エラーハンドリング
@@ -144,12 +155,14 @@ flutter run
 ```
 
 **学習内容:**
+
 - Flutter から Gemini API への基本的な接続
 - シンプルなチャット機能の実装
 - API キーの設定と認証
 - ツール機能は未実装（確認用ボタンあり）
 
 **特徴:**
+
 - 最小限のコード構成
 - Gemini との対話のみ
 - エラーハンドリングの基本
@@ -162,17 +175,20 @@ flutter run
 ```
 
 **学習内容:**
+
 - Function Calling の実装
 - ローカルツールの定義と実行
 - ツールの手動実行とAI自動選択
 - ツール実行結果の処理
 
 **実装されているツール:**
+
 1. **hello_gemini**: Gemini への挨拶ツール
 2. **calculate**: 2つの整数の計算ツール
 3. **web_search**: Web検索のモック実装
 
 **特徴:**
+
 - ツール一覧表示機能
 - 手動ツール実行ダイアログ
 - AI による自動ツール選択
@@ -186,6 +202,7 @@ flutter run
 ```
 
 **学習内容:**
+
 - MCP (Model Context Protocol) サーバーとの接続
 - 複数のMCPクライアント管理
 - 動的なサーバー追加・削除
@@ -193,6 +210,7 @@ flutter run
 - Step 1, 2の機能も統合された完全版
 
 **特徴:**
+
 - 本格的なMCPサーバー連携
 - サーバー状態管理
 - 認証とエラーハンドリング
@@ -200,6 +218,7 @@ flutter run
 - Step 1, 2の画面も含む統合版として実装
 
 **追加ファイル:**
+
 - **step1_chat_screen.dart**: Step 1の機能をStep 3内で利用可能にした画面
 - **step2_chat_screen.dart**: Step 2の機能をStep 3内で利用可能にした画面
 - **mcp_tools.dart**: MCPツールの管理とGemini形式への変換
